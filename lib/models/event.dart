@@ -8,7 +8,10 @@ class Event {
   final String price;
   final String imageUrl;
   final String? iconEmoji;
+  final String? organizer;
+  final String? description;
   final bool isBookmarked;
+  final bool isUserCreated;
 
   Event({
     required this.id,
@@ -20,7 +23,10 @@ class Event {
     required this.price,
     required this.imageUrl,
     this.iconEmoji,
+    this.organizer,
+    this.description,
     this.isBookmarked = false,
+    this.isUserCreated = false,
   });
 
   String get formattedDate {
@@ -38,5 +44,36 @@ class Event {
   }
 
   String get formattedDateTime => '$formattedDate • $formattedTime';
-}
 
+  Event copyWith({
+    String? id,
+    String? title,
+    String? category,
+    DateTime? dateTime,
+    String? location,
+    int? attendees,
+    String? price,
+    String? imageUrl,
+    String? iconEmoji,
+    String? organizer,
+    String? description,
+    bool? isBookmarked,
+    bool? isUserCreated,
+  }) {
+    return Event(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      category: category ?? this.category,
+      dateTime: dateTime ?? this.dateTime,
+      location: location ?? this.location,
+      attendees: attendees ?? this.attendees,
+      price: price ?? this.price,
+      imageUrl: imageUrl ?? this.imageUrl,
+      iconEmoji: iconEmoji ?? this.iconEmoji,
+      organizer: organizer ?? this.organizer,
+      description: description ?? this.description,
+      isBookmarked: isBookmarked ?? this.isBookmarked,
+      isUserCreated: isUserCreated ?? this.isUserCreated,
+    );
+  }
+}

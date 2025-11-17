@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import 'signup_page.dart';
+import 'pages/role_selection_page.dart';
 import 'pages/main_navigation.dart';
+import 'pages/organizer_dashboard.dart';
+import 'pages/admin_dashboard.dart';
+import 'models/user_role.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -64,16 +67,47 @@ class _LoginPageState extends State<LoginPage> {
           _isLoading = false;
         });
 
-        // Navigate to dashboard
+        final roleState = RoleSelectionState.instance;
+        final isOrganizer = roleState.isOrganizer;
+        final isAdmin = roleState.isAdmin;
+        
+        // Check for admin credentials (for demo purposes)
+        final email = _emailController.text.trim().toLowerCase();
+        final password = _passwordController.text.trim();
+        const adminPassword = 'Admin@123';
+        final isAdminEmail = email == 'admin@admin.com' || email == 'admin';
+        final isAdminLogin = isAdminEmail && password == adminPassword;
+        if (isAdminEmail && password != adminPassword) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Invalid admin password'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        Widget destination;
+        if (isAdminLogin || isAdmin) {
+          roleState.setRole(UserRole.admin);
+          destination = const AdminDashboard();
+        } else if (isOrganizer) {
+          destination = const OrganizerDashboard();
+        } else {
+          destination = const MainNavigation();
+        }
+
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const MainNavigation()),
+          MaterialPageRoute(builder: (context) => destination),
         );
 
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Login successful!'),
+          SnackBar(
+            content: Text(isAdminLogin || isAdmin
+                ? 'Admin login successful!'
+                : 'Login successful!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -111,7 +145,7 @@ class _LoginPageState extends State<LoginPage> {
   void _handleSignUp() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const SignUpPage()),
+      MaterialPageRoute(builder: (context) => const RoleSelectionPage()),
     );
   }
 

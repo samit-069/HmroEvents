@@ -208,7 +208,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'City Events Ltd',
+                            event.organizer ?? 'City Events Ltd',
                             style: TextStyle(
                               fontSize: 16,
                               color: Colors.grey[600],
@@ -248,7 +248,8 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Join us for an unforgettable evening of live music featuring top local and international artists. Experience multiple genres across three stages with food trucks, art installations, and interactive experiences.',
+                        event.description ??
+                            'Join us for an unforgettable experience featuring curated programming, live acts, and community storytelling.',
                         style: TextStyle(
                           fontSize: 16,
                           color: Colors.grey[700],
@@ -285,9 +286,9 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                                         ),
                                       ),
                                       const SizedBox(height: 4),
-                                      const Text(
-                                        'City Events Ltd',
-                                        style: TextStyle(
+                                      Text(
+                                        event.organizer ?? 'City Events Ltd',
+                                        style: const TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.black,

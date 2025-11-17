@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../login_page.dart';
+import 'event_upload_dashboard.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -180,6 +181,20 @@ class _ProfilePageState extends State<ProfilePage> {
                     subtitle: 'Manage your notifications',
                     onTap: () {
                       _showNotificationsSettings();
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  _buildMenuCard(
+                    icon: Icons.dashboard_customize_outlined,
+                    title: 'Event Upload Dashboard',
+                    subtitle: 'Publish & manage your events',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const EventUploadDashboard(),
+                        ),
+                      );
                     },
                   ),
                   const SizedBox(height: 12),

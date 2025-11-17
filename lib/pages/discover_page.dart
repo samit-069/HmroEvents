@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/event.dart';
 import '../widgets/event_card.dart';
+import '../models/event_store.dart';
 import 'profile_page.dart';
 import 'event_details_page.dart';
 
@@ -14,8 +15,10 @@ class DiscoverPage extends StatefulWidget {
 class _DiscoverPageState extends State<DiscoverPage> {
   String selectedCategory = 'All Events';
   String currentLocation = 'Kupondole, Lalitpur';
-  final List<Event> _allEvents = [];
+  late final EventStore _eventStore;
+  List<Event> _allEvents = [];
   List<Event> _filteredEvents = [];
+  late VoidCallback _eventListener;
 
   final List<Map<String, dynamic>> _categories = [
     {'name': 'All Events', 'icon': Icons.local_fire_department, 'emoji': '🔥'},
@@ -30,99 +33,22 @@ class _DiscoverPageState extends State<DiscoverPage> {
   @override
   void initState() {
     super.initState();
-    _initializeEvents();
+    _eventStore = EventStore.instance;
+    _allEvents = _eventStore.events;
     _filterEvents();
+    _eventListener = () {
+      setState(() {
+        _allEvents = _eventStore.events;
+        _filterEvents();
+      });
+    };
+    _eventStore.eventsNotifier.addListener(_eventListener);
   }
 
-  void _initializeEvents() {
-    _allEvents.addAll([
-      Event(
-        id: '1',
-        title: 'PCPS Dashain Fest 2025',
-        category: 'Music',
-        dateTime: DateTime(2025, 11, 15, 18, 0),
-        location: 'Kupondole, Lalitpur',
-        attendees: 2500,
-        price: 'From Rs. 100',
-        imageUrl: '',
-        iconEmoji: '🎵',
-      ),
-      Event(
-        id: '2',
-        title: 'Tech Innovation Conference',
-        category: 'Conference',
-        dateTime: DateTime(2025, 11, 8, 9, 0),
-        location: 'Hotel Soaltee, Kathmandu',
-        attendees: 850,
-        price: 'From Rs. 80',
-        imageUrl: '',
-      ),
-      Event(
-        id: '3',
-        title: 'College Basketball Championship',
-        category: 'Sports',
-        dateTime: DateTime(2025, 11, 5, 19, 30),
-        location: 'PCPS College, Kupondole',
-        attendees: 5000,
-        price: 'From Rs. 250',
-        imageUrl: '',
-        iconEmoji: '🏀',
-      ),
-      Event(
-        id: '4',
-        title: 'International Food Festival',
-        category: 'Food & Drink',
-        dateTime: DateTime(2025, 11, 14, 11, 0),
-        location: 'Bhrikutimandap, KTM',
-        attendees: 3200,
-        price: 'Free Entry',
-        imageUrl: '',
-        iconEmoji: '🍜',
-      ),
-      Event(
-        id: '5',
-        title: 'Modern Art Exhibition',
-        category: 'Art & Culture',
-        dateTime: DateTime(2025, 11, 1, 10, 0),
-        location: 'Naxal, KTM',
-        attendees: 450,
-        price: 'From Rs. 75',
-        imageUrl: '',
-        iconEmoji: '🎨',
-      ),
-      Event(
-        id: '6',
-        title: 'Digital Marketing Workshop',
-        category: 'Workshop',
-        dateTime: DateTime(2025, 11, 20, 14, 0),
-        location: 'Learning Hub Room 301',
-        attendees: 120,
-        price: 'From Rs. 89',
-        imageUrl: '',
-      ),
-      Event(
-        id: '7',
-        title: 'Jazz Night Under the Stars',
-        category: 'Music',
-        dateTime: DateTime(2025, 11, 18, 20, 0),
-        location: 'Maitidevi',
-        attendees: 600,
-        price: 'From Rs. 300',
-        imageUrl: '',
-        iconEmoji: '✈️',
-      ),
-      Event(
-        id: '8',
-        title: 'Startup Pitch Competition',
-        category: 'Conference',
-        dateTime: DateTime(2025, 11, 10, 13, 0),
-        location: 'Global College',
-        attendees: 300,
-        price: 'From Rs. 50',
-        imageUrl: '',
-        iconEmoji: '🚀',
-      ),
-    ]);
+  @override
+  void dispose() {
+    _eventStore.eventsNotifier.removeListener(_eventListener);
+    super.dispose();
   }
 
   void _filterEvents() {
@@ -143,24 +69,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
   }
 
   void _onBookmark(Event event) {
-    setState(() {
-      final index = _allEvents.indexWhere((e) => e.id == event.id);
-      if (index != -1) {
-        _allEvents[index] = Event(
-          id: _allEvents[index].id,
-          title: _allEvents[index].title,
-          category: _allEvents[index].category,
-          dateTime: _allEvents[index].dateTime,
-          location: _allEvents[index].location,
-          attendees: _allEvents[index].attendees,
-          price: _allEvents[index].price,
-          imageUrl: _allEvents[index].imageUrl,
-          iconEmoji: _allEvents[index].iconEmoji,
-          isBookmarked: !_allEvents[index].isBookmarked,
-        );
-        _filterEvents();
-      }
-    });
+    _eventStore.toggleBookmark(event.id);
   }
 
   @override

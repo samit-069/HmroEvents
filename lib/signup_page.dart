@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'login_page.dart';
+import 'models/user_role.dart';
 
 class SignUpPage extends StatefulWidget {
-  const SignUpPage({super.key});
+  final UserRole role;
+  const SignUpPage({super.key, this.role = UserRole.user});
 
   @override
   State<SignUpPage> createState() => _SignUpPageState();
@@ -94,6 +96,8 @@ class _SignUpPageState extends State<SignUpPage> {
             backgroundColor: Colors.green,
           ),
         );
+
+        RoleSelectionState.instance.setRole(widget.role);
 
         // Navigate to login page after successful signup
         Navigator.pushReplacement(
