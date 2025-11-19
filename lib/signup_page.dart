@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'login_page.dart';
 import 'models/user_role.dart';
+import 'services/auth_service.dart';
 
 class SignUpPage extends StatefulWidget {
   final UserRole role;
@@ -80,29 +81,30 @@ class _SignUpPageState extends State<SignUpPage> {
       setState(() {
         _isLoading = true;
       });
+      final roleString = widget.role == UserRole.organizer ? 'organizer' : 'user';
+      final res = await AuthService.register(
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+        role: roleString,
+      );
 
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 1));
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
 
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-
-        // Show success message
+      if (res['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account created successfully!'),
-            backgroundColor: Colors.green,
-          ),
+          SnackBar(content: Text(res['message'] ?? 'Account created successfully!'), backgroundColor: Colors.green),
         );
-
         RoleSelectionState.instance.setRole(widget.role);
-
-        // Navigate to login page after successful signup
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginPage()));
+      } else {
+        final msg = (res['message'] ?? 'Registration failed').toString();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: Colors.red),
         );
       }
     }

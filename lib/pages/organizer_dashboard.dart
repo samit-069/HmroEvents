@@ -5,11 +5,42 @@ import '../models/event_store.dart';
 import '../models/event.dart';
 import '../widgets/event_card.dart';
 import '../widgets/event_edit_dialog.dart';
+import '../services/auth_service.dart';
+import '../services/event_api_service.dart';
+import 'event_details_page.dart';
 
-class OrganizerDashboard extends StatelessWidget {
+class OrganizerDashboard extends StatefulWidget {
   const OrganizerDashboard({super.key});
 
+  @override
+  State<OrganizerDashboard> createState() => _OrganizerDashboardState();
+}
+
+class _OrganizerDashboardState extends State<OrganizerDashboard> {
   static final EventStore _eventStore = EventStore.instance;
+  String _organizerName = 'Organizer';
+  String _organizerEmail = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMe();
+  }
+
+  Future<void> _loadMe() async {
+    final res = await AuthService.getCurrentUser();
+    if (!mounted) return;
+    if (res['success'] == true && res['user'] != null) {
+      final u = res['user'];
+      final first = (u['firstName'] ?? '').toString();
+      final last = (u['lastName'] ?? '').toString();
+      final nameFromParts = (first + ' ' + last).trim();
+      setState(() {
+        _organizerName = (u['name'] ?? '').toString().isNotEmpty ? u['name'] : (nameFromParts.isNotEmpty ? nameFromParts : 'Organizer');
+        _organizerEmail = (u['email'] ?? '').toString();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +103,7 @@ class OrganizerDashboard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Welcome back, Organizer 👋',
+            'Welcome back, $_organizerName 👋',
             style: TextStyle(
               color: Colors.white.withOpacity(0.9),
               fontSize: 14,
@@ -87,6 +118,16 @@ class OrganizerDashboard extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
           ),
+          if (_organizerEmail.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              _organizerEmail,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 13,
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),
@@ -184,6 +225,14 @@ class OrganizerDashboard extends StatelessWidget {
                     children: [
                       EventCard(
                         event: event,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EventDetailsPage(event: event),
+                            ),
+                          );
+                        },
                         onBookmark: () => _eventStore.toggleBookmark(event.id),
                       ),
                       Padding(
@@ -224,13 +273,34 @@ class OrganizerDashboard extends StatelessWidget {
       builder: (context) => EventEditDialog(
         event: event,
         onSave: (updatedEvent) {
-          _eventStore.updateEvent(updatedEvent);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${updatedEvent.title} has been updated'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          EventApiService.updateEvent(
+            id: updatedEvent.id,
+            title: updatedEvent.title,
+            category: updatedEvent.category,
+            dateTime: updatedEvent.dateTime,
+            location: updatedEvent.location,
+            attendees: updatedEvent.attendees,
+            price: updatedEvent.price,
+            imageUrl: updatedEvent.imageUrl,
+            iconEmoji: updatedEvent.iconEmoji,
+            organizer: updatedEvent.organizer ?? '',
+            description: updatedEvent.description ?? '',
+          ).then((resp) async {
+            if (resp['success'] == true) {
+              await _eventStore.refreshEvents();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(resp['message'] ?? 'Event updated'), backgroundColor: Colors.green),
+                );
+              }
+            } else {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(resp['message'] ?? 'Failed to update event'), backgroundColor: Colors.red),
+                );
+              }
+            }
+          });
         },
       ),
     );
@@ -249,14 +319,23 @@ class OrganizerDashboard extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () {
-              _eventStore.deleteEvent(event.id);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${event.title} has been deleted'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              EventApiService.deleteEvent(event.id).then((resp) async {
+                Navigator.pop(context);
+                if (resp['success'] == true) {
+                  await _eventStore.refreshEvents();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(resp['message'] ?? 'Event deleted'), backgroundColor: Colors.red),
+                    );
+                  }
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(resp['message'] ?? 'Failed to delete event'), backgroundColor: Colors.red),
+                    );
+                  }
+                }
+              });
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,

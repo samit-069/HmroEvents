@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/event.dart';
 import '../models/event_store.dart';
 import '../widgets/event_card.dart';
+import '../services/event_api_service.dart';
+import '../services/upload_service.dart';
+import 'event_details_page.dart';
 
 class EventUploadDashboard extends StatefulWidget {
   final bool embedded;
@@ -23,6 +28,7 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
   final _descriptionController = TextEditingController();
 
   final EventStore _eventStore = EventStore.instance;
+  final ImagePicker _imagePicker = ImagePicker();
 
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
@@ -38,6 +44,15 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // Ensure stats and lists reflect live data from backend
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _eventStore.refreshEvents();
+    });
+  }
+
+  @override
   void dispose() {
     _titleController.dispose();
     _locationController.dispose();
@@ -49,23 +64,36 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
     super.dispose();
   }
 
+  Future<void> _pickBannerImage() async {
+    final XFile? picked = await _imagePicker.pickImage(source: ImageSource.gallery);
+    if (picked != null) {
+      setState(() {
+        _imageUrlController.text = picked.path;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final body = ValueListenableBuilder<List<Event>>(
       valueListenable: _eventStore.eventsNotifier,
       builder: (context, events, _) {
         final userEvents = events.where((event) => event.isUserCreated).toList();
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildStatsRow(events, userEvents),
-              const SizedBox(height: 24),
-              _buildUploadForm(),
-              const SizedBox(height: 32),
-              _buildRecentUploads(userEvents),
-            ],
+        return RefreshIndicator(
+          onRefresh: _eventStore.refreshEvents,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildStatsRow(events, userEvents),
+                const SizedBox(height: 24),
+                _buildUploadForm(),
+                const SizedBox(height: 32),
+                _buildRecentUploads(userEvents),
+              ],
+            ),
           ),
         );
       },
@@ -216,10 +244,69 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
               ],
             ),
             const SizedBox(height: 16),
-            _buildTextField(
-              controller: _imageUrlController,
-              label: 'Banner Image URL',
-              icon: Icons.image_outlined,
+            // Banner image picker
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Banner Image',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: _pickBannerImage,
+                        icon: const Icon(Icons.photo_library_outlined),
+                        label: const Text('Choose from Gallery'),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _imageUrlController.text.isEmpty
+                              ? 'No file selected'
+                              : _imageUrlController.text,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: Colors.grey[700]),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (_imageUrlController.text.isNotEmpty)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: SizedBox(
+                        height: 140,
+                        width: double.infinity,
+                        child: _imageUrlController.text.startsWith('http')
+                            ? Image.network(
+                                _imageUrlController.text,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: Colors.grey[200],
+                                  child: const Center(child: Icon(Icons.broken_image)),
+                                ),
+                              )
+                            : Image.file(
+                                File(_imageUrlController.text),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: Colors.grey[200],
+                                  child: const Center(child: Icon(Icons.broken_image)),
+                                ),
+                              ),
+                      ),
+                    ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             _buildTextField(
@@ -378,7 +465,7 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
     }
   }
 
-  void _onSubmit() {
+  Future<void> _onSubmit() async {
     final isValid = _formKey.currentState?.validate() ?? false;
     if (!isValid) return;
     if (_selectedDate == null || _selectedTime == null) {
@@ -399,29 +486,46 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
         ? 'Independent Organizer'
         : _organizerController.text.trim();
 
-    final newEvent = Event(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+    // Upload image if it's a local file path
+    String imageUrl = _imageUrlController.text.trim();
+    if (imageUrl.isNotEmpty && !imageUrl.startsWith('http')) {
+      final up = await UploadService.uploadImage(File(imageUrl));
+      if (up['success'] == true && up['url'] != null) {
+        imageUrl = up['url'];
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(up['message'] ?? 'Failed to upload image'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+    }
+
+    final resp = await EventApiService.createEvent(
       title: _titleController.text.trim(),
       category: _selectedCategory,
       dateTime: dateTime,
       location: _locationController.text.trim(),
       attendees: attendees,
       price: _priceController.text.trim().isEmpty ? 'Free Entry' : _priceController.text.trim(),
-      imageUrl: _imageUrlController.text.trim(),
+      imageUrl: imageUrl,
+      iconEmoji: '',
       organizer: organizerName,
       description: _descriptionController.text.trim().isEmpty
           ? 'Details coming soon. Stay tuned!'
           : _descriptionController.text.trim(),
-      isUserCreated: true,
     );
 
-    _eventStore.addEvent(newEvent);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Event published successfully'),
-      ),
-    );
+    if (resp['success'] == true) {
+      await _eventStore.refreshEvents();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(resp['message'] ?? 'Event published successfully'), backgroundColor: Colors.green),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(resp['message'] ?? 'Failed to publish event'), backgroundColor: Colors.red),
+      );
+      return;
+    }
 
     _formKey.currentState?.reset();
     _titleController.clear();
@@ -480,6 +584,14 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
         ...userEvents.take(3).map(
               (event) => EventCard(
                 event: event,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EventDetailsPage(event: event),
+                    ),
+                  );
+                },
                 onBookmark: () => _eventStore.toggleBookmark(event.id),
               ),
             ),

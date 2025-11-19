@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 import '../models/event.dart';
 
 class EventCard extends StatelessWidget {
@@ -92,20 +93,35 @@ class EventCard extends StatelessWidget {
                     width: double.infinity,
                     color: Colors.grey[300],
                     child: event.imageUrl.isNotEmpty
-                        ? Image.network(
-                            event.imageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: _getCategoryColor(event.category),
-                                child: Icon(
-                                  _getCategoryIcon(event.category),
-                                  size: 60,
-                                  color: Colors.white,
-                                ),
-                              );
-                            },
-                          )
+                        ? (event.imageUrl.startsWith('http')
+                            ? Image.network(
+                                event.imageUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: _getCategoryColor(event.category),
+                                    child: Icon(
+                                      _getCategoryIcon(event.category),
+                                      size: 60,
+                                      color: Colors.white,
+                                    ),
+                                  );
+                                },
+                              )
+                            : Image.file(
+                                File(event.imageUrl),
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: _getCategoryColor(event.category),
+                                    child: Icon(
+                                      _getCategoryIcon(event.category),
+                                      size: 60,
+                                      color: Colors.white,
+                                    ),
+                                  );
+                                },
+                              ))
                         : Container(
                             color: _getCategoryColor(event.category),
                             child: Icon(

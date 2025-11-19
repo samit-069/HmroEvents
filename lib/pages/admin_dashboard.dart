@@ -3,6 +3,7 @@ import '../models/user_store.dart';
 import '../models/user_model.dart';
 import '../models/event_store.dart';
 import '../models/event.dart';
+import '../services/admin_api_service.dart';
 import '../models/user_role.dart';
 import '../widgets/event_card.dart';
 import '../widgets/event_edit_dialog.dart';
@@ -25,6 +26,124 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    // Load events initially
+    _eventStore.refreshEvents();
+    // Refresh when switching to Events tab
+    _tabController.addListener(() {
+      if (_tabController.index == 2) {
+        _eventStore.refreshEvents();
+      }
+    });
+  }
+
+  void _toggleBlockUser(Map<String, dynamic> user) async {
+    final id = (user['_id'] ?? user['id'] ?? '').toString();
+    if (id.isEmpty) return;
+    final res = await AdminApiService.blockToggle(id);
+    if (!mounted) return;
+    if (res['success'] == true) {
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res['message'] ?? 'Updated'), backgroundColor: Colors.green),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res['message'] ?? 'Failed'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  void _confirmDeleteUser(Map<String, dynamic> user) {
+    final id = (user['_id'] ?? user['id'] ?? '').toString();
+    final display = (user['name'] ?? user['email'] ?? 'this user').toString();
+    if (id.isEmpty) return;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete User'),
+        content: Text('Are you sure you want to delete $display? This action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final res = await AdminApiService.deleteUser(id);
+              if (!mounted) return;
+              if (res['success'] == true) {
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('User deleted'), backgroundColor: Colors.red),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(res['message'] ?? 'Failed to delete user'), backgroundColor: Colors.red),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditUserDialogMap(Map<String, dynamic> user) {
+    final id = (user['_id'] ?? user['id'] ?? '').toString();
+    if (id.isEmpty) return;
+    final nameController = TextEditingController(
+      text: (user['name'] ?? '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}').toString().trim(),
+    );
+    final emailController = TextEditingController(text: (user['email'] ?? '').toString());
+    final phoneController = TextEditingController(text: (user['phone'] ?? '').toString());
+    final locationController = TextEditingController(text: (user['location'] ?? '').toString());
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit User'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Full Name')),
+              const SizedBox(height: 8),
+              TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email')),
+              const SizedBox(height: 8),
+              TextField(controller: phoneController, decoration: const InputDecoration(labelText: 'Phone')),
+              const SizedBox(height: 8),
+              TextField(controller: locationController, decoration: const InputDecoration(labelText: 'Location')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final updates = <String, dynamic>{};
+              updates['name'] = nameController.text.trim();
+              updates['email'] = emailController.text.trim();
+              updates['phone'] = phoneController.text.trim();
+              updates['location'] = locationController.text.trim();
+              Navigator.pop(context);
+              final res = await AdminApiService.updateUser(id, updates);
+              if (!mounted) return;
+              if (res['success'] == true) {
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('User updated'), backgroundColor: Colors.green),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(res['message'] ?? 'Failed to update user'), backgroundColor: Colors.red),
+                );
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -38,7 +157,7 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Admin Dashboard'),
+        title: const Text('Event Us'),
         centerTitle: true,
         backgroundColor: Colors.red.shade700,
         foregroundColor: Colors.white,
@@ -46,11 +165,34 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
-              RoleSelectionState.instance.setRole(UserRole.user);
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginPage()),
-                (route) => false,
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Confirm Logout'),
+                  content: const Text('Are you sure you want to logout?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        RoleSelectionState.instance.setRole(UserRole.user);
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (context) => const LoginPage()),
+                          (route) => false,
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Logout'),
+                    ),
+                  ],
+                ),
               );
             },
           ),
@@ -79,149 +221,96 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
   }
 
   Widget _buildOverviewTab() {
-    return ValueListenableBuilder<List<AppUser>>(
-      valueListenable: _userStore.usersNotifier,
-      builder: (context, users, _) {
-        return ValueListenableBuilder<List<Event>>(
-          valueListenable: _eventStore.eventsNotifier,
-          builder: (context, events, _) {
-            final totalUsers = users.length;
-            final blockedUsers = users.where((u) => u.isBlocked).length;
-            final totalOrganizers = users.where((u) => u.role == UserRole.organizer).length;
-            final totalEvents = events.length;
-            final userCreatedEvents = events.where((e) => e.isUserCreated).length;
+    return FutureBuilder<Map<String, dynamic>>(
+      future: AdminApiService.getMetrics(),
+      builder: (context, snapshot) {
+        final loading = snapshot.connectionState == ConnectionState.waiting;
+        final ok = snapshot.hasData && snapshot.data!['success'] == true;
+        final totalUsers = ok ? snapshot.data!['totalUsers'] as int : 0;
+        final blockedUsers = ok ? snapshot.data!['blockedUsers'] as int : 0;
+        final totalOrganizers = ok ? snapshot.data!['organizers'] as int : 0;
+        final totalEvents = ok ? snapshot.data!['totalEvents'] as int : 0;
 
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Dashboard Overview',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20),
+              if (loading) const LinearProgressIndicator(),
+              Row(
                 children: [
-                  const Text(
-                    'Dashboard Overview',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: _StatCard(
+                      title: 'Total Users',
+                      value: '$totalUsers',
+                      icon: Icons.people,
+                      color: Colors.blue,
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatCard(
-                          title: 'Total Users',
-                          value: '$totalUsers',
-                          icon: Icons.people,
-                          color: Colors.blue,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _StatCard(
-                          title: 'Blocked Users',
-                          value: '$blockedUsers',
-                          icon: Icons.block,
-                          color: Colors.red,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatCard(
-                          title: 'Organizers',
-                          value: '$totalOrganizers',
-                          icon: Icons.business,
-                          color: Colors.purple,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _StatCard(
-                          title: 'Total Events',
-                          value: '$totalEvents',
-                          icon: Icons.event,
-                          color: Colors.green,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatCard(
-                          title: 'User Events',
-                          value: '$userCreatedEvents',
-                          icon: Icons.upload,
-                          color: Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Quick Actions',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _StatCard(
+                      title: 'Blocked Users',
+                      value: '$blockedUsers',
+                      icon: Icons.block,
+                      color: Colors.red,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildQuickActionCard(
-                    icon: Icons.people_outline,
-                    title: 'Manage Users',
-                    subtitle: 'View and block/unblock users',
-                    onTap: () => _tabController.animateTo(1),
-                    color: Colors.blue,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildQuickActionCard(
-                    icon: Icons.event_note,
-                    title: 'View All Events',
-                    subtitle: 'Browse and manage events',
-                    onTap: () => _tabController.animateTo(2),
-                    color: Colors.green,
                   ),
                 ],
               ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildUsersTab() {
-    return ValueListenableBuilder<List<AppUser>>(
-      valueListenable: _userStore.usersNotifier,
-      builder: (context, users, _) {
-        return DefaultTabController(
-          length: 3,
-          child: Column(
-            children: [
-              Container(
-                color: Colors.white,
-                child: TabBar(
-                  labelColor: Colors.red.shade700,
-                  unselectedLabelColor: Colors.grey,
-                  indicatorColor: Colors.red.shade700,
-                  tabs: const [
-                    Tab(text: 'All Users'),
-                    Tab(text: 'Organizers'),
-                    Tab(text: 'Blocked'),
-                  ],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _StatCard(
+                      title: 'Organizers',
+                      value: '$totalOrganizers',
+                      icon: Icons.business,
+                      color: Colors.purple,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _StatCard(
+                      title: 'Total Events',
+                      value: '$totalEvents',
+                      icon: Icons.event,
+                      color: Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Quick Actions',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    _buildUserList(users),
-                    _buildUserList(_userStore.organizers),
-                    _buildUserList(_userStore.blockedUsers),
-                  ],
-                ),
+              const SizedBox(height: 12),
+              _buildQuickActionCard(
+                icon: Icons.people_outline,
+                title: 'Manage Users',
+                subtitle: 'View and block/unblock users',
+                onTap: () => _tabController.animateTo(1),
+                color: Colors.blue,
+              ),
+              const SizedBox(height: 12),
+              _buildQuickActionCard(
+                icon: Icons.event_note,
+                title: 'View All Events',
+                subtitle: 'Browse and manage events',
+                onTap: () => _tabController.animateTo(2),
+                color: Colors.green,
               ),
             ],
           ),
@@ -230,29 +319,152 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
     );
   }
 
-  Widget _buildUserList(List<AppUser> users) {
-    if (users.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'No users found',
-              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+  Widget _buildUsersTab() {
+    return DefaultTabController(
+      length: 3,
+      child: Column(
+        children: [
+          Container(
+            color: Colors.white,
+            child: TabBar(
+              labelColor: Colors.red.shade700,
+              unselectedLabelColor: Colors.grey,
+              indicatorColor: Colors.red.shade700,
+              tabs: const [
+                Tab(text: 'All Users'),
+                Tab(text: 'Organizers'),
+                Tab(text: 'Blocked'),
+              ],
             ),
-          ],
-        ),
-      );
-    }
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildUsersListFromBackend(() => AdminApiService.getUsers()),
+                _buildUsersListFromBackend(() => AdminApiService.getOrganizers()),
+                _buildUsersListFromBackend(() => AdminApiService.getBlockedUsers()),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: users.length,
-      itemBuilder: (context, index) {
-        final user = users[index];
-        return _buildUserCard(user);
+  Widget _buildUsersListFromBackend(Future<List<Map<String, dynamic>>> Function() loader) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: loader(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final list = snapshot.data ?? [];
+        if (list.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                Text(
+                  'No users found',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                ),
+              ],
+            ),
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: list.length,
+          itemBuilder: (context, index) {
+            final u = list[index];
+            final isOrganizer = (u['role'] ?? '') == 'organizer';
+            final isBlocked = (u['isBlocked'] ?? false) == true;
+            final name = (u['name'] ?? '').toString().isNotEmpty
+                ? u['name']
+                : '${u['firstName'] ?? ''} ${u['lastName'] ?? ''}'.trim();
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: isOrganizer ? Colors.purple.shade100 : Colors.blue.shade100,
+                  child: Icon(isOrganizer ? Icons.business : Icons.person,
+                      color: isOrganizer ? Colors.purple.shade700 : Colors.blue.shade700),
+                ),
+                title: Text(
+                  name.isNotEmpty ? name : (u['email'] ?? 'Unknown'),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    decoration: isBlocked ? TextDecoration.lineThrough : null,
+                  ),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(u['email'] ?? ''),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isOrganizer ? Colors.purple.shade100 : Colors.blue.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            isOrganizer ? 'Organizer' : 'User',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isOrganizer ? Colors.purple.shade700 : Colors.blue.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        if (isBlocked)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'Blocked',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.red.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.blue),
+                      onPressed: () => _showEditUserDialogMap(u),
+                      tooltip: 'Edit',
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        isBlocked ? Icons.check_circle : Icons.block,
+                        color: isBlocked ? Colors.green : Colors.red,
+                      ),
+                      onPressed: () => _toggleBlockUser(u),
+                      tooltip: isBlocked ? 'Unblock' : 'Block',
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
       },
     );
   }
@@ -284,7 +496,9 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
           children: [
             Text(user.email),
             const SizedBox(height: 4),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -305,8 +519,7 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                     ),
                   ),
                 ),
-                if (user.isBlocked) ...[
-                  const SizedBox(width: 8),
+                if (user.isBlocked)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -322,7 +535,6 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                       ),
                     ),
                   ),
-                ],
               ],
             ),
           ],
@@ -341,10 +553,6 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
               ),
               onPressed: () => _showBlockDialog(user),
             ),
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: () => _showDeleteUserDialog(user),
-            ),
           ],
         ),
       ),
@@ -352,65 +560,73 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
   }
 
   Widget _buildEventsTab() {
-    return ValueListenableBuilder<List<Event>>(
-      valueListenable: _eventStore.eventsNotifier,
-      builder: (context, events, _) {
-        if (events.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+    return RefreshIndicator(
+      onRefresh: _eventStore.refreshEvents,
+      child: ValueListenableBuilder<List<Event>>(
+        valueListenable: _eventStore.eventsNotifier,
+        builder: (context, events, _) {
+          if (events.isEmpty) {
+            return ListView(
+              padding: const EdgeInsets.all(16),
               children: [
-                Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                Text(
-                  'No events found',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                const SizedBox(height: 120),
+                Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No events found',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                      ),
+                    ],
+                  ),
                 ),
               ],
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: events.length,
-          itemBuilder: (context, index) {
-            final event = events[index];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 16),
-              child: Column(
-                children: [
-                  EventCard(
-                    event: event,
-                    onBookmark: () => _eventStore.toggleBookmark(event.id),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton.icon(
-                          onPressed: () => _showEditEventDialog(event),
-                          icon: const Icon(Icons.edit, size: 18),
-                          label: const Text('Edit'),
-                          style: TextButton.styleFrom(foregroundColor: Colors.blue),
-                        ),
-                        const SizedBox(width: 8),
-                        TextButton.icon(
-                          onPressed: () => _showDeleteEventDialog(event),
-                          icon: const Icon(Icons.delete, size: 18),
-                          label: const Text('Delete'),
-                          style: TextButton.styleFrom(foregroundColor: Colors.red),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
             );
-          },
-        );
-      },
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: events.length,
+            itemBuilder: (context, index) {
+              final event = events[index];
+              return Card(
+                margin: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  children: [
+                    EventCard(
+                      event: event,
+                      onBookmark: () => _eventStore.toggleBookmark(event.id),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton.icon(
+                            onPressed: () => _showEditEventDialog(event),
+                            icon: const Icon(Icons.edit, size: 18),
+                            label: const Text('Edit'),
+                            style: TextButton.styleFrom(foregroundColor: Colors.blue),
+                          ),
+                          const SizedBox(width: 8),
+                          TextButton.icon(
+                            onPressed: () => _showDeleteEventDialog(event),
+                            icon: const Icon(Icons.delete, size: 18),
+                            label: const Text('Delete'),
+                            style: TextButton.styleFrom(foregroundColor: Colors.red),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 

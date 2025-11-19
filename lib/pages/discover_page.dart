@@ -43,6 +43,10 @@ class _DiscoverPageState extends State<DiscoverPage> {
       });
     };
     _eventStore.eventsNotifier.addListener(_eventListener);
+    // Load latest events from backend
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _eventStore.refreshEvents();
+    });
   }
 
   @override
@@ -68,14 +72,14 @@ class _DiscoverPageState extends State<DiscoverPage> {
     });
   }
 
-  void _onBookmark(Event event) {
-    _eventStore.toggleBookmark(event.id);
+  Future<void> _onBookmark(Event event) async {
+    await _eventStore.toggleBookmark(event.id);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Theme.of(context).colorScheme.background,
       body: Column(
         children: [
           // Header Section
@@ -284,23 +288,27 @@ class _DiscoverPageState extends State<DiscoverPage> {
                     ),
                   ),
                   Expanded(
-                    child: ListView.builder(
-                      itemCount: _filteredEvents.length,
-                      itemBuilder: (context, index) {
-                        final event = _filteredEvents[index];
-                        return EventCard(
-                          event: event,
-                          onBookmark: () => _onBookmark(event),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => EventDetailsPage(event: event),
-                              ),
-                            );
-                          },
-                        );
-                      },
+                    child: RefreshIndicator(
+                      onRefresh: _eventStore.refreshEvents,
+                      child: ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        itemCount: _filteredEvents.length,
+                        itemBuilder: (context, index) {
+                          final event = _filteredEvents[index];
+                          return EventCard(
+                            event: event,
+                            onBookmark: () async => await _onBookmark(event),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => EventDetailsPage(event: event),
+                                ),
+                              ).then((_) => _eventStore.refreshEvents());
+                            },
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ],

@@ -1,10 +1,11 @@
 import 'package:flutter/foundation.dart';
 
 import 'event.dart';
+import '../services/event_api_service.dart';
 
 class EventStore {
   EventStore._internal() {
-    _events = _seedEvents();
+    _events = [];
     eventsNotifier = ValueNotifier<List<Event>>(List.unmodifiable(_events));
   }
 
@@ -27,12 +28,9 @@ class EventStore {
     _notifyListeners();
   }
 
-  void toggleBookmark(String eventId) {
-    final index = _events.indexWhere((event) => event.id == eventId);
-    if (index == -1) return;
-    final event = _events[index];
-    _events[index] = event.copyWith(isBookmarked: !event.isBookmarked);
-    _notifyListeners();
+  Future<void> toggleBookmark(String eventId) async {
+    await EventApiService.toggleBookmark(eventId);
+    await refreshEvents();
   }
 
   void deleteEvent(String eventId) {
@@ -49,6 +47,16 @@ class EventStore {
 
   List<Event> userCreatedEvents() {
     return _events.where((event) => event.isUserCreated).toList();
+  }
+
+  Future<void> refreshEvents() async {
+    final list = await EventApiService.getEvents();
+    _events = list;
+    _notifyListeners();
+  }
+
+  Future<List<Event>> bookmarkedEvents() async {
+    return await EventApiService.getEvents(bookmarked: true);
   }
 
   void _notifyListeners() {

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'pages/role_selection_page.dart';
 import 'pages/main_navigation.dart';
 import 'pages/organizer_dashboard.dart';
+import 'pages/organizer_main_navigation.dart';
 import 'pages/admin_dashboard.dart';
 import 'models/user_role.dart';
+import 'services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -59,58 +61,81 @@ class _LoginPageState extends State<LoginPage> {
         _isLoading = true;
       });
 
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 1));
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
+
+      // Hard-coded admin bypass (no backend user required)
+      if (email == 'admin@hamroevent.com' && password == 'hamroevents@123') {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          RoleSelectionState.instance.setRole(UserRole.admin);
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const AdminDashboard()),
+          );
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Logged in as Admin'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Call API
+      final result = await AuthService.login(
+        email: email,
+        password: password,
+      );
 
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
 
-        final roleState = RoleSelectionState.instance;
-        final isOrganizer = roleState.isOrganizer;
-        final isAdmin = roleState.isAdmin;
-        
-        // Check for admin credentials (for demo purposes)
-        final email = _emailController.text.trim().toLowerCase();
-        final password = _passwordController.text.trim();
-        const adminPassword = 'Admin@123';
-        final isAdminEmail = email == 'admin@admin.com' || email == 'admin';
-        final isAdminLogin = isAdminEmail && password == adminPassword;
-        if (isAdminEmail && password != adminPassword) {
+        if (result['success']) {
+          final user = result['user'];
+          final roleState = RoleSelectionState.instance;
+          
+          // Set role based on API response
+          final role = user['role'] ?? 'user';
+          if (role == 'admin') {
+            roleState.setRole(UserRole.admin);
+          } else if (role == 'organizer') {
+            roleState.setRole(UserRole.organizer);
+          } else {
+            roleState.setRole(UserRole.user);
+          }
+
+          Widget destination;
+          if (role == 'admin') {
+            destination = const AdminDashboard();
+          } else if (role == 'organizer') {
+            destination = const OrganizerMainNavigation();
+          } else {
+            destination = const MainNavigation();
+          }
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => destination),
+          );
+
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Invalid admin password'),
+            SnackBar(
+              content: Text(result['message'] ?? 'Login successful!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Login failed'),
               backgroundColor: Colors.red,
             ),
           );
-          return;
         }
-
-        Widget destination;
-        if (isAdminLogin || isAdmin) {
-          roleState.setRole(UserRole.admin);
-          destination = const AdminDashboard();
-        } else if (isOrganizer) {
-          destination = const OrganizerDashboard();
-        } else {
-          destination = const MainNavigation();
-        }
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => destination),
-        );
-
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isAdminLogin || isAdmin
-                ? 'Admin login successful!'
-                : 'Login successful!'),
-            backgroundColor: Colors.green,
-          ),
-        );
       }
     }
   }
@@ -162,23 +187,11 @@ class _LoginPageState extends State<LoginPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 20),
-                // Login Page header
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Login Page',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.normal,
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 40),
                 // Evntus branding
                 const Center(
                   child: Text(
-                    'Evntus',
+                    'Event Us',
                     style: TextStyle(
                       fontSize: 48,
                       fontFamily: 'serif',
@@ -384,33 +397,18 @@ class _LoginPageState extends State<LoginPage> {
                           border: Border.all(color: Colors.grey[300]!),
                         ),
                         child: Center(
-                          child: Text(
-                            'G',
-                            style: TextStyle(
-                              color: Colors.grey[800],
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
+                          child: Image.network(
+                            'https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/512px-Google_%22G%22_Logo.svg.png',
+                            width: 24,
+                            height: 24,
+                            errorBuilder: (context, error, stackTrace) => Text(
+                              'G',
+                              style: TextStyle(
+                                color: Colors.grey[800],
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 24),
-                    // Apple
-                    GestureDetector(
-                      onTap: () => _handleSocialLogin('Apple'),
-                      child: Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: Colors.black,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.apple,
-                            color: Colors.white,
-                            size: 24,
                           ),
                         ),
                       ),

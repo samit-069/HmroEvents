@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/event.dart';
 import '../widgets/event_card.dart';
 import 'event_details_page.dart';
+import '../models/event_store.dart';
 
 class SavedPage extends StatefulWidget {
   const SavedPage({super.key});
@@ -11,27 +12,44 @@ class SavedPage extends StatefulWidget {
 }
 
 class _SavedPageState extends State<SavedPage> {
-  // In a real app, this would come from a state management solution
-  final List<Event> _savedEvents = [];
+  final EventStore _store = EventStore.instance;
+  List<Event> _savedEvents = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSaved();
+  }
+
+  Future<void> _loadSaved() async {
+    setState(() => _loading = true);
+    final list = await _store.bookmarkedEvents();
+    if (!mounted) return;
+    setState(() {
+      _savedEvents = list;
+      _loading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Theme.of(context).colorScheme.background,
       body: SafeArea(
         child: Column(
           children: [
             // Header
             Container(
               padding: const EdgeInsets.all(20),
-              child: const Row(
+              child: Row(
                 children: [
                   Text(
                     'Saved Events',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                      color: Theme.of(context).colorScheme.onBackground,
                     ),
                   ),
                 ],
@@ -39,30 +57,34 @@ class _SavedPageState extends State<SavedPage> {
             ),
             // Content
             Expanded(
-              child: _savedEvents.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: _savedEvents.length,
-                      itemBuilder: (context, index) {
-                        final event = _savedEvents[index];
-                        return EventCard(
-                          event: event,
-                          onBookmark: () {
-                            setState(() {
-                              _savedEvents.removeAt(index);
-                            });
-                          },
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => EventDetailsPage(event: event),
-                              ),
-                            );
-                          },
-                        );
-                      },
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : RefreshIndicator(
+                      onRefresh: _loadSaved,
+                      child: _savedEvents.isEmpty
+                          ? _buildEmptyState()
+                          : ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              itemCount: _savedEvents.length,
+                              itemBuilder: (context, index) {
+                                final event = _savedEvents[index];
+                                return EventCard(
+                                  event: event,
+                                  onBookmark: () async {
+                                    await _store.toggleBookmark(event.id);
+                                    await _loadSaved();
+                                  },
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => EventDetailsPage(event: event),
+                                      ),
+                                    ).then((_) => _loadSaved());
+                                  },
+                                );
+                              },
+                            ),
                     ),
             ),
           ],
@@ -87,7 +109,7 @@ class _SavedPageState extends State<SavedPage> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
+              color: Theme.of(context).colorScheme.onBackground,
             ),
           ),
           const SizedBox(height: 8),

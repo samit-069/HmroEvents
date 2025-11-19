@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../login_page.dart';
 import 'event_upload_dashboard.dart';
+import '../services/auth_service.dart';
+import '../services/user_api_service.dart';
+import '../main.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -10,11 +13,38 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  // Sample user data - in a real app, this would come from a state management solution
-  String userName = 'John Doe';
-  String userEmail = 'john.doe@example.com';
-  String userPhone = '+977 9841234567';
-  String userLocation = 'Kupondole, Lalitpur';
+  // Values will be loaded from backend on init
+  String userName = '';
+  String userEmail = '';
+  String userPhone = '';
+  String userLocation = '';
+  String _userId = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentUser();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final res = await AuthService.getCurrentUser();
+    if (!mounted) return;
+    if (res['success'] == true && res['user'] != null) {
+      final u = res['user'] as Map<String, dynamic>;
+      final first = (u['firstName'] ?? '').toString();
+      final last = (u['lastName'] ?? '').toString();
+      final fullFromParts = (first + ' ' + last).trim();
+      setState(() {
+        _userId = (u['_id'] ?? u['id'] ?? '').toString();
+        userName = (u['name'] ?? '').toString().isNotEmpty
+            ? u['name']
+            : (fullFromParts.isNotEmpty ? fullFromParts : (u['email'] ?? '').toString());
+        userEmail = (u['email'] ?? '').toString();
+        userPhone = (u['phone'] ?? '').toString();
+        userLocation = (u['location'] ?? '').toString();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,9 +77,16 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.white),
+                        icon: Icon(
+                          ThemeController.instance.mode.value == ThemeMode.light
+                              ? Icons.dark_mode
+                              : Icons.light_mode,
+                          color: Colors.white,
+                        ),
                         onPressed: () {
-                          _showEditProfileDialog();
+                          setState(() {
+                            ThemeController.instance.toggle();
+                          });
                         },
                       ),
                     ],
@@ -184,20 +221,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     },
                   ),
                   const SizedBox(height: 12),
-                  _buildMenuCard(
-                    icon: Icons.dashboard_customize_outlined,
-                    title: 'Event Upload Dashboard',
-                    subtitle: 'Publish & manage your events',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const EventUploadDashboard(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
+                  // Removed Event Upload Dashboard from user profile
                   _buildMenuCard(
                     icon: Icons.lock_outline,
                     title: 'Privacy & Security',
@@ -454,8 +478,10 @@ class _ProfilePageState extends State<ProfilePage> {
           TextButton(
             onPressed: () {
               if (controller.text.isNotEmpty) {
-                onSave(controller.text);
+                final val = controller.text.trim();
+                onSave(val);
                 Navigator.pop(context);
+                _saveField(fieldName, val);
               }
             },
             child: const Text('Save'),
@@ -463,6 +489,29 @@ class _ProfilePageState extends State<ProfilePage> {
         ],
       ),
     );
+  }
+
+  Future<void> _saveField(String field, String value) async {
+    if (_userId.isEmpty) return;
+    final keyMap = {
+      'Full Name': 'name',
+      'Email': 'email',
+      'Phone Number': 'phone',
+      'Location': 'location',
+    };
+    final key = keyMap[field];
+    if (key == null) return;
+    final res = await UserApiService.updateUser(_userId, { key: value });
+    if (!mounted) return;
+    if (res['success'] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res['message'] ?? 'Profile updated'), backgroundColor: Colors.green),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res['message'] ?? 'Failed to update profile'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   void _showNotificationsSettings() {

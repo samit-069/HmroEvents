@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import '../models/event.dart';
+import '../services/event_api_service.dart';
+import '../widgets/event_card.dart';
+import 'event_details_page.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -9,15 +14,25 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage> {
   final TextEditingController _searchController = TextEditingController();
-  final List<String> _recentSearches = [
-    'Music Events',
-    'Tech Conference',
-    'Food Festival',
+  final List<String> _recentSearches = [];
+  final List<Map<String, dynamic>> _popularCategories = const [
+    {'name': 'Music', 'icon': Icons.music_note},
+    {'name': 'Conference', 'icon': Icons.business},
+    {'name': 'Sports', 'icon': Icons.sports_basketball},
+    {'name': 'Food & Drink', 'icon': Icons.restaurant},
+    {'name': 'Art & Culture', 'icon': Icons.palette},
+    {'name': 'Workshop', 'icon': Icons.school},
   ];
+
+  List<Event> _results = [];
+  bool _loading = false;
+  String _selectedCategory = '';
+  Timer? _debounce;
 
   @override
   void dispose() {
     _searchController.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
@@ -62,13 +77,14 @@ class _SearchPageState extends State<SearchPage> {
                   fillColor: Colors.grey[100],
                 ),
                 onChanged: (value) {
+                  _triggerSearch();
                   setState(() {});
                 },
               ),
             ),
             // Search Results or Suggestions
             Expanded(
-              child: _searchController.text.isEmpty
+              child: _showingSuggestions
                   ? _buildSuggestions()
                   : _buildSearchResults(),
             ),
@@ -77,6 +93,8 @@ class _SearchPageState extends State<SearchPage> {
       ),
     );
   }
+
+  bool get _showingSuggestions => _searchController.text.isEmpty && _selectedCategory.isEmpty && !_loading && _results.isEmpty;
 
   Widget _buildSuggestions() {
     return ListView(
@@ -97,7 +115,8 @@ class _SearchPageState extends State<SearchPage> {
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: () {
                   _searchController.text = search;
-                  setState(() {});
+                  _selectedCategory = '';
+                  _triggerSearch();
                 },
               )),
           const SizedBox(height: 24),
@@ -114,12 +133,7 @@ class _SearchPageState extends State<SearchPage> {
           spacing: 12,
           runSpacing: 12,
           children: [
-            _buildCategoryChip('Music', Icons.music_note),
-            _buildCategoryChip('Conference', Icons.business),
-            _buildCategoryChip('Sports', Icons.sports_basketball),
-            _buildCategoryChip('Food & Drink', Icons.restaurant),
-            _buildCategoryChip('Art & Culture', Icons.palette),
-            _buildCategoryChip('Workshop', Icons.school),
+            ..._popularCategories.map((c) => _buildCategoryChip(c['name'], c['icon'])),
           ],
         ),
       ],
@@ -137,33 +151,80 @@ class _SearchPageState extends State<SearchPage> {
         ],
       ),
       onSelected: (selected) {
-        _searchController.text = label;
-        setState(() {});
+        _selectedCategory = selected ? label : '';
+        _triggerSearch();
       },
     );
   }
 
   Widget _buildSearchResults() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.search_off,
-            size: 64,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No results found for "${_searchController.text}"',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_results.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off,
+              size: 64,
+              color: Colors.grey[400],
             ),
-          ),
-        ],
-      ),
+            const SizedBox(height: 16),
+            Text(
+              'No results found',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(20),
+      itemCount: _results.length,
+      itemBuilder: (context, index) {
+        final event = _results[index];
+        return EventCard(
+          event: event,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => EventDetailsPage(event: event),
+              ),
+            );
+          },
+        );
+      },
     );
+  }
+
+  void _triggerSearch() {
+    // Save recent
+    final q = _searchController.text.trim();
+    if (q.isNotEmpty && (_recentSearches.isEmpty || _recentSearches.first != q)) {
+      _recentSearches.remove(q);
+      _recentSearches.insert(0, q);
+      if (_recentSearches.length > 5) _recentSearches.removeLast();
+    }
+
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () async {
+      setState(() => _loading = true);
+      final results = await EventApiService.getEvents(
+        search: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
+        category: _selectedCategory.isEmpty ? null : _selectedCategory,
+      );
+      if (!mounted) return;
+      setState(() {
+        _results = results;
+        _loading = false;
+      });
+    });
   }
 }
 

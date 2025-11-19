@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 import '../models/event.dart';
+import '../services/event_api_service.dart';
+import '../models/event_store.dart';
+import '../widgets/event_edit_dialog.dart';
+import '../services/auth_service.dart';
 
 class EventDetailsPage extends StatefulWidget {
   final Event event;
@@ -15,11 +20,36 @@ class EventDetailsPage extends StatefulWidget {
 
 class _EventDetailsPageState extends State<EventDetailsPage> {
   bool _isBookmarked = false;
+  late Event _event;
+  bool _loading = true;
+  bool _isOrganizer = false;
 
   @override
   void initState() {
     super.initState();
-    _isBookmarked = widget.event.isBookmarked;
+    _event = widget.event;
+    _isBookmarked = _event.isBookmarked;
+    _loadLatest();
+    _loadRole();
+  }
+
+  Future<void> _loadLatest() async {
+    final latest = await EventApiService.getEventById(widget.event.id);
+    if (!mounted) return;
+    setState(() {
+      _event = latest ?? _event;
+      _loading = false;
+    });
+  }
+
+  Future<void> _loadRole() async {
+    final res = await AuthService.getCurrentUser();
+    if (!mounted) return;
+    if (res['success'] == true && res['user'] != null) {
+      setState(() {
+        _isOrganizer = (res['user']['role'] ?? '') == 'organizer';
+      });
+    }
   }
 
   IconData _getCategoryIcon(String category) {
@@ -74,12 +104,14 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final event = widget.event;
+    final event = _event;
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
         children: [
+          if (_loading)
+            const Center(child: CircularProgressIndicator()),
           SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -92,20 +124,35 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                       width: double.infinity,
                       color: Colors.grey[300],
                       child: event.imageUrl.isNotEmpty
-                          ? Image.network(
-                              event.imageUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  color: _getCategoryColor(event.category),
-                                  child: Icon(
-                                    _getCategoryIcon(event.category),
-                                    size: 80,
-                                    color: Colors.white,
-                                  ),
-                                );
-                              },
-                            )
+                          ? (event.imageUrl.startsWith('http')
+                              ? Image.network(
+                                  event.imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      color: _getCategoryColor(event.category),
+                                      child: Icon(
+                                        _getCategoryIcon(event.category),
+                                        size: 80,
+                                        color: Colors.white,
+                                      ),
+                                    );
+                                  },
+                                )
+                              : Image.file(
+                                  File(event.imageUrl),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      color: _getCategoryColor(event.category),
+                                      child: Icon(
+                                        _getCategoryIcon(event.category),
+                                        size: 80,
+                                        color: Colors.white,
+                                      ),
+                                    );
+                                  },
+                                ))
                           : Container(
                               color: _getCategoryColor(event.category),
                               child: Icon(
@@ -345,71 +392,111 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Get Tickets Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          _showGetTicketsDialog();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    // Organizer actions: Edit / Delete
+                    if (_isOrganizer)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _editEvent(),
+                              icon: const Icon(Icons.edit),
+                              label: const Text('Edit'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.black,
+                                side: BorderSide(color: Colors.grey[300]!),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          'Get Tickets • ${event.price}',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _deleteEvent(),
+                              icon: const Icon(Icons.delete_outline),
+                              label: const Text('Delete'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red,
+                                side: const BorderSide(color: Colors.redAccent),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    if (!_isOrganizer) ...[
+                      const SizedBox(height: 12),
+                      // Get Tickets Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            _showGetTicketsDialog();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            'Get Tickets • ${event.price}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Share and Add to Calendar Buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              _shareEvent();
-                            },
-                            icon: const Icon(Icons.share),
-                            label: const Text('Share'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.black,
-                              side: BorderSide(color: Colors.grey[300]!),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                      const SizedBox(height: 12),
+                      // Share and Add to Calendar Buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                _shareEvent();
+                              },
+                              icon: const Icon(Icons.share),
+                              label: const Text('Share'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.black,
+                                side: BorderSide(color: Colors.grey[300]!),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
                               ),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              _addToCalendar();
-                            },
-                            icon: const Icon(Icons.calendar_today),
-                            label: const Text('Add to Calendar'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.black,
-                              side: BorderSide(color: Colors.grey[300]!),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                _addToCalendar();
+                              },
+                              icon: const Icon(Icons.calendar_today),
+                              label: const Text('Add to Calendar'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.black,
+                                side: BorderSide(color: Colors.grey[300]!),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
                               ),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -508,5 +595,74 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
       ),
     );
   }
-}
 
+  void _editEvent() {
+    showDialog(
+      context: context,
+      builder: (context) => EventEditDialog(
+        event: _event,
+        onSave: (updated) async {
+          final resp = await EventApiService.updateEvent(
+            id: updated.id,
+            title: updated.title,
+            category: updated.category,
+            dateTime: updated.dateTime,
+            location: updated.location,
+            attendees: updated.attendees,
+            price: updated.price,
+            imageUrl: updated.imageUrl,
+            iconEmoji: updated.iconEmoji,
+            organizer: updated.organizer ?? '',
+            description: updated.description ?? '',
+          );
+          if (!mounted) return;
+          if (resp['success'] == true) {
+            await EventStore.instance.refreshEvents();
+            // If API returned updated event, use it; else use the updated model
+            setState(() => _event = resp['event'] as Event? ?? updated);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(resp['message'] ?? 'Event updated'), backgroundColor: Colors.green),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(resp['message'] ?? 'Failed to update event'), backgroundColor: Colors.red),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  void _deleteEvent() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Event'),
+        content: Text('Are you sure you want to delete "${_event.title}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final resp = await EventApiService.deleteEvent(_event.id);
+              if (!mounted) return;
+              if (resp['success'] == true) {
+                await EventStore.instance.refreshEvents();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(resp['message'] ?? 'Event deleted'), backgroundColor: Colors.red),
+                );
+                Navigator.pop(context);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(resp['message'] ?? 'Failed to delete event'), backgroundColor: Colors.red),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+}

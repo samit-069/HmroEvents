@@ -119,7 +119,7 @@ class _LoadingPageState extends State<LoadingPage> with SingleTickerProviderStat
                       const SizedBox(height: 40),
                       // App Name
                       const Text(
-                        'Evntus',
+                        'Event Us',
                         style: TextStyle(
                           fontSize: 48,
                           fontFamily: 'serif',
