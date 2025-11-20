@@ -24,7 +24,7 @@ router.post('/register', [
 
     const user = await User.create({ firstName, lastName, email: email.toLowerCase(), password, phone: phone || '', role: role || 'user' });
     const token = generateToken(user._id);
-    res.status(201).json({ success: true, message: 'User registered successfully', data: { token, user: { id: user._id, name: user.name, email: user.email, role: user.role, phone: user.phone, createdAt: user.createdAt } } });
+    res.status(201).json({ success: true, message: 'User registered successfully', data: { token, user: { id: user._id, name: user.name, email: user.email, role: user.role, phone: user.phone, kycStatus: user.kycStatus, createdAt: user.createdAt } } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
@@ -51,7 +51,7 @@ router.post('/login', [
     if (!match) return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
     const token = generateToken(user._id);
-    res.json({ success: true, message: 'Login successful', data: { token, user: { id: user._id, name: user.name, email: user.email, role: user.role, phone: user.phone, createdAt: user.createdAt } } });
+    res.json({ success: true, message: 'Login successful', data: { token, user: { id: user._id, name: user.name, email: user.email, role: user.role, phone: user.phone, kycStatus: user.kycStatus, createdAt: user.createdAt } } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
@@ -60,7 +60,25 @@ router.post('/login', [
 router.get('/me', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
-    res.json({ success: true, data: { user: { id: user._id, firstName: user.firstName, lastName: user.lastName, name: user.name, email: user.email, phone: user.phone, role: user.role, location: user.location, isBlocked: user.isBlocked, createdAt: user.createdAt } } });
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          location: user.location,
+          isBlocked: user.isBlocked,
+          kycStatus: user.kycStatus,
+          kycSubmittedAt: user.kycSubmittedAt,
+          createdAt: user.createdAt,
+        },
+      },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }

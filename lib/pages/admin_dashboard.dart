@@ -381,6 +381,7 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
             final u = list[index];
             final isOrganizer = (u['role'] ?? '') == 'organizer';
             final isBlocked = (u['isBlocked'] ?? false) == true;
+            final kycStatus = (u['kycStatus'] ?? 'none').toString();
             final name = (u['name'] ?? '').toString().isNotEmpty
                 ? u['name']
                 : '${u['firstName'] ?? ''} ${u['lastName'] ?? ''}'.trim();
@@ -423,6 +424,34 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                             ),
                           ),
                         ),
+                        if (isOrganizer)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: kycStatus == 'verified'
+                                  ? Colors.green.shade100
+                                  : (kycStatus == 'pending'
+                                      ? Colors.orange.shade100
+                                      : Colors.grey.shade200),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              kycStatus == 'verified'
+                                  ? 'KYC Verified'
+                                  : (kycStatus == 'pending'
+                                      ? 'KYC Pending'
+                                      : 'KYC None'),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: kycStatus == 'verified'
+                                    ? Colors.green.shade700
+                                    : (kycStatus == 'pending'
+                                        ? Colors.orange.shade700
+                                        : Colors.grey.shade700),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
                         if (isBlocked)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -461,6 +490,79 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                     ),
                   ],
                 ),
+                onTap: () {
+                  if (!isOrganizer) return;
+                  final id = (u['_id'] ?? u['id'] ?? '').toString();
+                  if (id.isEmpty) return;
+                  showDialog(
+                    context: context,
+                    builder: (context) {
+                      return AlertDialog(
+                        title: const Text('Organizer KYC'),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Name: ' + (name.isNotEmpty ? name : (u['email'] ?? ''))),
+                            const SizedBox(height: 4),
+                            Text('Email: ' + (u['email'] ?? '')), 
+                            const SizedBox(height: 4),
+                            Text('Phone: ' + ((u['phone'] ?? '') as String)),
+                            const SizedBox(height: 8),
+                            Text('KYC Status: ' + kycStatus),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Review the organizer details and then accept or decline the KYC.',
+                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Close'),
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              final res = await AdminApiService.setKycStatus(id, 'rejected');
+                              if (!mounted) return;
+                              Navigator.pop(context);
+                              if (res['success'] == true) {
+                                setState(() {});
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('KYC declined'), backgroundColor: Colors.orange),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(res['message'] ?? 'Failed to decline KYC'), backgroundColor: Colors.red),
+                                );
+                              }
+                            },
+                            child: const Text('Decline', style: TextStyle(color: Colors.orange)),
+                          ),
+                          ElevatedButton(
+                            onPressed: () async {
+                              final res = await AdminApiService.setKycStatus(id, 'verified');
+                              if (!mounted) return;
+                              Navigator.pop(context);
+                              if (res['success'] == true) {
+                                setState(() {});
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('KYC verified'), backgroundColor: Colors.green),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(res['message'] ?? 'Failed to verify KYC'), backgroundColor: Colors.red),
+                                );
+                              }
+                            },
+                            child: const Text('Accept'),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
               ),
             );
           },

@@ -19,6 +19,7 @@ class _ProfilePageState extends State<ProfilePage> {
   String userPhone = '';
   String userLocation = '';
   String _userId = '';
+  String _kycStatus = '';
 
   @override
   void initState() {
@@ -42,6 +43,7 @@ class _ProfilePageState extends State<ProfilePage> {
         userEmail = (u['email'] ?? '').toString();
         userPhone = (u['phone'] ?? '').toString();
         userLocation = (u['location'] ?? '').toString();
+        _kycStatus = (u['kycStatus'] ?? '').toString();
       });
     }
   }
@@ -154,6 +156,54 @@ class _ProfilePageState extends State<ProfilePage> {
                       color: Colors.white.withOpacity(0.9),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  if (_kycStatus.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _kycStatus == 'verified'
+                            ? Colors.green.withOpacity(0.2)
+                            : (_kycStatus == 'pending'
+                                ? Colors.orange.withOpacity(0.2)
+                                : Colors.red.withOpacity(0.2)),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _kycStatus == 'verified'
+                                ? Icons.verified
+                                : (_kycStatus == 'pending'
+                                    ? Icons.watch_later_outlined
+                                    : Icons.error_outline),
+                            size: 16,
+                            color: _kycStatus == 'verified'
+                                ? Colors.greenAccent
+                                : (_kycStatus == 'pending'
+                                    ? Colors.orange
+                                    : Colors.redAccent),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _kycStatus == 'verified'
+                                ? 'KYC Verified'
+                                : (_kycStatus == 'pending'
+                                    ? 'KYC Pending'
+                                    : 'KYC Required'),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: _kycStatus == 'verified'
+                                  ? Colors.greenAccent
+                                  : (_kycStatus == 'pending'
+                                      ? Colors.orange
+                                      : Colors.redAccent),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),

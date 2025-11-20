@@ -13,8 +13,8 @@ class _OrganizerMainNavigationState extends State<OrganizerMainNavigation> {
   int _currentIndex = 0;
 
   final List<Widget> _pages = const [
-    ProfilePage(),
     EventUploadDashboard(),
+    ProfilePage(),
   ];
 
   @override
@@ -29,12 +29,12 @@ class _OrganizerMainNavigationState extends State<OrganizerMainNavigation> {
         onTap: (index) => setState(() => _currentIndex = index),
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Profile',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.cloud_upload_outlined),
             label: 'Create Event',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            label: 'Profile',
           ),
         ],
       ),

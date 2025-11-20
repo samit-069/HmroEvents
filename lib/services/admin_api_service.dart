@@ -98,4 +98,20 @@ class AdminApiService {
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }
+
+  static Future<Map<String, dynamic>> setKycStatus(String userId, String status) async {
+    try {
+      final uri = Uri.parse(ApiConfig.getUrl('/admin/users/$userId/kyc-status'));
+      final res = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'status': status}),
+      );
+      final data = jsonDecode(res.body);
+      if (res.statusCode == 200 && data['success'] == true) return data;
+      return {'success': false, 'message': data['message'] ?? 'Failed to update KYC status'};
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
 }

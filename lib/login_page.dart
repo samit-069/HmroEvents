@@ -3,6 +3,7 @@ import 'pages/role_selection_page.dart';
 import 'pages/main_navigation.dart';
 import 'pages/organizer_dashboard.dart';
 import 'pages/organizer_main_navigation.dart';
+import 'pages/organizer_kyc_personal_page.dart';
 import 'pages/admin_dashboard.dart';
 import 'models/user_role.dart';
 import 'services/auth_service.dart';
@@ -112,7 +113,14 @@ class _LoginPageState extends State<LoginPage> {
           if (role == 'admin') {
             destination = const AdminDashboard();
           } else if (role == 'organizer') {
-            destination = const OrganizerMainNavigation();
+            final kycStatus = (user['kycStatus'] ?? 'none').toString();
+            // If organizer KYC is already verified, go straight to organizer dashboard
+            if (kycStatus == 'verified') {
+              destination = const OrganizerMainNavigation();
+            } else {
+              // Otherwise, start with KYC flow
+              destination = const OrganizerKycPersonalPage();
+            }
           } else {
             destination = const MainNavigation();
           }

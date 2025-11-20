@@ -23,6 +23,25 @@ router.get('/metrics', async (req, res) => {
   }
 });
 
+// Set KYC status (verify/reject) for a user
+router.post('/users/:id/kyc-status', async (req, res) => {
+  try {
+    const { status } = req.body || {};
+    if (!['pending', 'verified', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid KYC status' });
+    }
+    const update = { kycStatus: status };
+    if (status === 'pending') {
+      update.kycSubmittedAt = new Date();
+    }
+    const user = await User.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    res.json({ success: true, message: 'KYC status updated', data: { user } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+});
+
 module.exports = router;
 // Public users listing for admin bypass UI
 router.get('/users', async (req, res) => {
@@ -68,7 +87,7 @@ router.post('/users/:id/block-toggle', async (req, res) => {
 // Edit user basic fields
 router.put('/users/:id', async (req, res) => {
   try {
-    const { firstName, lastName, name, email, phone, location, isBlocked } = req.body || {};
+    const { firstName, lastName, name, email, phone, location, isBlocked, kycStatus } = req.body || {};
     const update = {};
     if (firstName !== undefined) update.firstName = firstName;
     if (lastName !== undefined) update.lastName = lastName;
@@ -86,6 +105,7 @@ router.put('/users/:id', async (req, res) => {
     if (phone !== undefined) update.phone = phone;
     if (location !== undefined) update.location = location;
     if (isBlocked !== undefined) update.isBlocked = !!isBlocked;
+    if (kycStatus !== undefined) update.kycStatus = kycStatus;
 
     const user = await User.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });

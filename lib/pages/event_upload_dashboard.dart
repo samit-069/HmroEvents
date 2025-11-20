@@ -106,7 +106,7 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Event Upload Dashboard'),
+        title: const Text('Event Us'),
         centerTitle: true,
       ),
       body: SafeArea(child: body),
