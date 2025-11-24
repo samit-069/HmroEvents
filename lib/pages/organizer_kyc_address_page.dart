@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../services/auth_service.dart';
+import '../services/user_api_service.dart';
 import 'organizer_main_navigation.dart';
 
 class OrganizerKycAddressPage extends StatefulWidget {
@@ -42,14 +44,58 @@ class _OrganizerKycAddressPageState extends State<OrganizerKycAddressPage> {
     super.dispose();
   }
 
-  void _handleSubmit() {
+  Future<void> _handleSubmit() async {
     if (_formKey.currentState?.validate() != true) return;
 
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const OrganizerMainNavigation()),
-      (route) => false,
-    );
+    // Load current user to get ID
+    final me = await AuthService.getCurrentUser();
+    if (me['success'] != true || me['user'] == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to load current user for KYC'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    final u = me['user'] as Map<String, dynamic>;
+    final userId = (u['id'] ?? u['_id'] ?? '').toString();
+    if (userId.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid user ID for KYC submission'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    final updates = <String, dynamic>{
+      'kycDob': widget.dob,
+      'kycCitizenshipNumber': widget.citizenshipNumber,
+      'kycProvince': _provinceController.text.trim(),
+      'kycDistrict': _districtController.text.trim(),
+      'kycMunicipality': _municipalityController.text.trim(),
+      'kycWard': _wardController.text.trim(),
+      'kycStreet': _streetController.text.trim(),
+      'kycStatus': 'pending',
+    };
+
+    final res = await UserApiService.updateUser(userId, updates);
+
+    if (!mounted) return;
+
+    if (res['success'] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('KYC submitted for review'), backgroundColor: Colors.green),
+      );
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const OrganizerMainNavigation()),
+        (route) => false,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res['message'] ?? 'Failed to submit KYC'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   @override

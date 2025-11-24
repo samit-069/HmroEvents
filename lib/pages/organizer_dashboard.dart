@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'event_upload_dashboard.dart';
+import '../services/notification_service.dart';
 import '../models/event_store.dart';
 import '../models/event.dart';
 import '../widgets/event_card.dart';
@@ -8,6 +9,8 @@ import '../widgets/event_edit_dialog.dart';
 import '../services/auth_service.dart';
 import '../services/event_api_service.dart';
 import 'event_details_page.dart';
+import 'organizer_ticket_scanner_page.dart';
+import '../localization/app_localizations.dart';
 
 class OrganizerDashboard extends StatefulWidget {
   const OrganizerDashboard({super.key});
@@ -47,12 +50,17 @@ class _OrganizerDashboardState extends State<OrganizerDashboard> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Organizer Dashboard'),
+        title: Text(AppLocalizations.of(context).t('organizer_dashboard_title')),
         centerTitle: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_none),
-            onPressed: () {},
+            onPressed: () {
+              NotificationService.instance.showSimpleNotification(
+                title: AppLocalizations.of(context).t('organizer_notify_title'),
+                body: AppLocalizations.of(context).t('organizer_notify_body'),
+              );
+            },
           ),
         ],
       ),
@@ -65,16 +73,16 @@ class _OrganizerDashboardState extends State<OrganizerDashboard> {
               children: [
                 _buildWelcomeCard(),
                 const SizedBox(height: 16),
-                const Text(
-                  'Event Uploads',
-                  style: TextStyle(
+                Text(
+                  AppLocalizations.of(context).t('organizer_event_uploads_title'),
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Create, manage, and track your upcoming events.',
+                  AppLocalizations.of(context).t('organizer_event_uploads_subtitle'),
                   style: TextStyle(
                     color: Colors.grey[600],
                   ),
@@ -103,16 +111,18 @@ class _OrganizerDashboardState extends State<OrganizerDashboard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Welcome back, $_organizerName 👋',
+            AppLocalizations.of(context)
+                .t('organizer_welcome')
+                .replaceFirst('{name}', _organizerName),
             style: TextStyle(
               color: Colors.white.withOpacity(0.9),
               fontSize: 14,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Ready to publish your next event?',
-            style: TextStyle(
+          Text(
+            AppLocalizations.of(context).t('organizer_ready_text'),
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -144,7 +154,7 @@ class _OrganizerDashboardState extends State<OrganizerDashboard> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Tip: Keep your banner image ratio 16:9 for best results.',
+                    AppLocalizations.of(context).t('organizer_tip_banner'),
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.9),
                       fontSize: 14,
@@ -163,16 +173,16 @@ class _OrganizerDashboardState extends State<OrganizerDashboard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Your Events',
-          style: TextStyle(
+        Text(
+          AppLocalizations.of(context).t('organizer_your_events_title'),
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          'Review the events you\'ve published.',
+          AppLocalizations.of(context).t('organizer_your_events_subtitle'),
           style: TextStyle(color: Colors.grey[600]),
         ),
         const SizedBox(height: 16),
@@ -195,7 +205,7 @@ class _OrganizerDashboardState extends State<OrganizerDashboard> {
                         size: 48, color: Colors.grey[400]),
                     const SizedBox(height: 12),
                     Text(
-                      'No events yet',
+                      AppLocalizations.of(context).t('organizer_no_events_title'),
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -204,7 +214,7 @@ class _OrganizerDashboardState extends State<OrganizerDashboard> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Publish an event to see it listed here.',
+                      AppLocalizations.of(context).t('organizer_no_events_subtitle'),
                       style: TextStyle(color: Colors.grey[600]),
                       textAlign: TextAlign.center,
                     ),
@@ -310,12 +320,16 @@ class _OrganizerDashboardState extends State<OrganizerDashboard> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Event'),
-        content: Text('Are you sure you want to delete "${event.title}"? This action cannot be undone.'),
+        title: Text(AppLocalizations.of(context).t('organizer_delete_event_title')),
+        content: Text(
+          AppLocalizations.of(context)
+              .t('organizer_delete_event_message')
+              .replaceFirst('{title}', event.title),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context).t('common_cancel')),
           ),
           ElevatedButton(
             onPressed: () {
@@ -341,7 +355,7 @@ class _OrganizerDashboardState extends State<OrganizerDashboard> {
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Delete'),
+            child: Text(AppLocalizations.of(context).t('common_delete')),
           ),
         ],
       ),

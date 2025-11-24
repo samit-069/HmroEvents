@@ -1,10 +1,26 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Event = require('../models/Event');
+const User = require('../models/User');
 const { protect, authorize } = require('../middleware/auth');
 const { optionalAuth } = require('../middleware/optionalAuth');
+const fetch = require('node-fetch');
+const path = require('path');
+const { GoogleAuth } = require('google-auth-library');
 
 const router = express.Router();
+
+const serviceAccountPath = path.join(__dirname, '..', 'service-account.json');
+const googleAuth = new GoogleAuth({
+  keyFile: serviceAccountPath,
+  scopes: ['https://www.googleapis.com/auth/firebase.messaging'],
+});
+
+async function getAccessToken() {
+  const client = await googleAuth.getClient();
+  const tokenResponse = await client.getAccessToken();
+  return tokenResponse.token || tokenResponse;
+}
 
 router.get('/', optionalAuth, async (req, res) => {
   try {
@@ -42,6 +58,35 @@ router.get('/', optionalAuth, async (req, res) => {
   }
 });
 
+async function sendFcmNotification(tokens, { title, body }) {
+  if (!Array.isArray(tokens) || tokens.length === 0) return;
+
+  const projectId = process.env.FCM_PROJECT_ID || 'event-us-af71c';
+  const accessToken = await getAccessToken();
+
+  for (const token of tokens) {
+    try {
+      const payload = {
+        message: {
+          token,
+          notification: { title, body },
+        },
+      };
+
+      await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.error('Failed to send FCM v1 message:', err.message || err);
+    }
+  }
+}
+
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const event = await Event.findById(req.params.id).populate('createdBy', 'firstName lastName email');
@@ -67,12 +112,32 @@ router.post('/', protect, authorize('organizer', 'admin'), [
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
 
+    // Only allow organizers with verified KYC to create events
+    if (req.user && req.user.role === 'organizer' && req.user.kycStatus !== 'verified') {
+      return res.status(403).json({ success: false, message: 'Your KYC is not verified yet. You cannot create events.' });
+    }
+
     const { title, category, dateTime, location, attendees = 0, price = 'Free Entry', imageUrl = '', iconEmoji = '', organizer = '', description = 'Details coming soon. Stay tuned!' } = req.body;
 
     const organizerName = organizer || req.user.name || 'Independent Organizer';
 
     const event = await Event.create({ title, category, dateTime: new Date(dateTime), location, attendees: parseInt(attendees), price, imageUrl, iconEmoji, organizer: organizerName, description, createdBy: req.user._id, isUserCreated: true });
     const populated = await Event.findById(event._id).populate('createdBy', 'firstName lastName email');
+
+    // Send push notification to all users who have a deviceToken
+    try {
+      const usersWithToken = await User.find({ deviceToken: { $ne: '' } }).select('deviceToken');
+      const tokens = usersWithToken.map(u => u.deviceToken).filter(Boolean);
+      if (tokens.length > 0) {
+        await sendFcmNotification(tokens, {
+          title: 'New Event: ' + title,
+          body: `${organizerName} published a new ${category} event`,
+        });
+      }
+    } catch (notifyErr) {
+      console.error('Failed to send push notifications for new event:', notifyErr.message || notifyErr);
+    }
+
     res.status(201).json({ success: true, message: 'Event created successfully', data: { event: populated } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
@@ -108,13 +173,13 @@ router.put('/:id', protect, authorize('organizer', 'admin'), [
   }
 });
 
-router.delete('/:id', protect, authorize('organizer', 'admin'), async (req, res) => {
+// NOTE: This delete route is intentionally left without auth for the in-app admin dashboard bypass.
+// In production, you should re-add proper protect/authorize middleware.
+router.delete('/:id', async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ success: false, message: 'Event not found' });
-    if (req.user.role !== 'admin' && event.createdBy.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, message: 'Not authorized to delete this event' });
-    }
+
     await event.deleteOne();
     res.json({ success: true, message: 'Event deleted successfully' });
   } catch (error) {

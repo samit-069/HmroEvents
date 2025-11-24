@@ -4,6 +4,7 @@ import '../models/user_model.dart';
 import '../models/event_store.dart';
 import '../models/event.dart';
 import '../services/admin_api_service.dart';
+import '../services/event_api_service.dart';
 import '../models/user_role.dart';
 import '../widgets/event_card.dart';
 import '../widgets/event_edit_dialog.dart';
@@ -494,6 +495,13 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                   if (!isOrganizer) return;
                   final id = (u['_id'] ?? u['id'] ?? '').toString();
                   if (id.isEmpty) return;
+                  final kycDob = (u['kycDob'] ?? '').toString();
+                  final kycCitizenshipNumber = (u['kycCitizenshipNumber'] ?? '').toString();
+                  final kycProvince = (u['kycProvince'] ?? '').toString();
+                  final kycDistrict = (u['kycDistrict'] ?? '').toString();
+                  final kycMunicipality = (u['kycMunicipality'] ?? '').toString();
+                  final kycWard = (u['kycWard'] ?? '').toString();
+                  final kycStreet = (u['kycStreet'] ?? '').toString();
                   showDialog(
                     context: context,
                     builder: (context) {
@@ -510,6 +518,32 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                             Text('Phone: ' + ((u['phone'] ?? '') as String)),
                             const SizedBox(height: 8),
                             Text('KYC Status: ' + kycStatus),
+                            const SizedBox(height: 8),
+                            if (kycDob.isNotEmpty) ...[
+                              Text('Date of Birth: ' + kycDob),
+                              const SizedBox(height: 4),
+                            ],
+                            if (kycCitizenshipNumber.isNotEmpty) ...[
+                              Text('Citizenship No.: ' + kycCitizenshipNumber),
+                              const SizedBox(height: 8),
+                            ],
+                            if (kycProvince.isNotEmpty ||
+                                kycDistrict.isNotEmpty ||
+                                kycMunicipality.isNotEmpty ||
+                                kycWard.isNotEmpty ||
+                                kycStreet.isNotEmpty) ...[
+                              const Text(
+                                'Address (as per KYC):',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 4),
+                              if (kycProvince.isNotEmpty) Text('Province: ' + kycProvince),
+                              if (kycDistrict.isNotEmpty) Text('District: ' + kycDistrict),
+                              if (kycMunicipality.isNotEmpty) Text('Municipality: ' + kycMunicipality),
+                              if (kycWard.isNotEmpty) Text('Ward: ' + kycWard),
+                              if (kycStreet.isNotEmpty) Text('Street/Tole: ' + kycStreet),
+                              const SizedBox(height: 8),
+                            ],
                             const SizedBox(height: 12),
                             const Text(
                               'Review the organizer details and then accept or decline the KYC.',
@@ -909,14 +943,29 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
           ),
           ElevatedButton(
             onPressed: () {
-              _eventStore.deleteEvent(event.id);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${event.title} has been deleted'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              EventApiService.deleteEvent(event.id).then((resp) async {
+                Navigator.pop(context);
+                if (resp['success'] == true) {
+                  await _eventStore.refreshEvents();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(resp['message'] ?? '${event.title} has been deleted'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(resp['message'] ?? 'Failed to delete event'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              });
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,

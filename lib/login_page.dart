@@ -114,12 +114,11 @@ class _LoginPageState extends State<LoginPage> {
             destination = const AdminDashboard();
           } else if (role == 'organizer') {
             final kycStatus = (user['kycStatus'] ?? 'none').toString();
-            // If organizer KYC is already verified, go straight to organizer dashboard
-            if (kycStatus == 'verified') {
-              destination = const OrganizerMainNavigation();
-            } else {
-              // Otherwise, start with KYC flow
+            // If KYC has never been started, go to KYC flow. Otherwise (pending, rejected, verified), go to organizer main nav.
+            if (kycStatus == 'none') {
               destination = const OrganizerKycPersonalPage();
+            } else {
+              destination = const OrganizerMainNavigation();
             }
           } else {
             destination = const MainNavigation();

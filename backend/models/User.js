@@ -10,9 +10,19 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ['user', 'organizer', 'admin'], default: 'user' },
   isBlocked: { type: Boolean, default: false },
   location: { type: String, default: '' },
+  avatar: { type: String, default: '' },
+  deviceToken: { type: String, default: '' },
   // KYC status for organizers: none, pending, verified, rejected
   kycStatus: { type: String, enum: ['none', 'pending', 'verified', 'rejected'], default: 'none' },
   kycSubmittedAt: { type: Date },
+  // Organizer KYC details (only used when role === 'organizer')
+  kycDob: { type: String, default: '' },
+  kycCitizenshipNumber: { type: String, default: '' },
+  kycProvince: { type: String, default: '' },
+  kycDistrict: { type: String, default: '' },
+  kycMunicipality: { type: String, default: '' },
+  kycWard: { type: String, default: '' },
+  kycStreet: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 

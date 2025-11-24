@@ -1,9 +1,19 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:image_picker/image_picker.dart';
 import '../login_page.dart';
 import 'event_upload_dashboard.dart';
+import 'your_tickets_page.dart';
+import 'notification_settings_page.dart';
+import 'change_password_page.dart';
+import 'help_support_page.dart';
 import '../services/auth_service.dart';
 import '../services/user_api_service.dart';
+import '../services/upload_service.dart';
 import '../main.dart';
+import '../localization/app_localizations.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -20,6 +30,11 @@ class _ProfilePageState extends State<ProfilePage> {
   String userLocation = '';
   String _userId = '';
   String _kycStatus = '';
+  String _role = '';
+
+  bool _locatingProfile = false;
+  File? _profileImageFile;
+  String _avatarUrl = '';
 
   @override
   void initState() {
@@ -37,6 +52,7 @@ class _ProfilePageState extends State<ProfilePage> {
       final fullFromParts = (first + ' ' + last).trim();
       setState(() {
         _userId = (u['_id'] ?? u['id'] ?? '').toString();
+        _role = (u['role'] ?? '').toString();
         userName = (u['name'] ?? '').toString().isNotEmpty
             ? u['name']
             : (fullFromParts.isNotEmpty ? fullFromParts : (u['email'] ?? '').toString());
@@ -44,6 +60,7 @@ class _ProfilePageState extends State<ProfilePage> {
         userPhone = (u['phone'] ?? '').toString();
         userLocation = (u['location'] ?? '').toString();
         _kycStatus = (u['kycStatus'] ?? '').toString();
+        _avatarUrl = (u['avatar'] ?? '').toString();
       });
     }
   }
@@ -70,9 +87,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Profile',
-                        style: TextStyle(
+                      Text(
+                        AppLocalizations.of(context).t('profile_title'),
+                        style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -108,10 +125,22 @@ class _ProfilePageState extends State<ProfilePage> {
                             width: 4,
                           ),
                         ),
-                        child: const Icon(
-                          Icons.person,
-                          size: 60,
-                          color: Colors.blue,
+                        child: ClipOval(
+                          child: _profileImageFile != null
+                              ? Image.file(
+                                  _profileImageFile!,
+                                  fit: BoxFit.cover,
+                                )
+                              : (_avatarUrl.isNotEmpty
+                                  ? Image.network(
+                                      _avatarUrl,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : const Icon(
+                                      Icons.person,
+                                      size: 60,
+                                      color: Colors.blue,
+                                    )),
                         ),
                       ),
                       Positioned(
@@ -128,10 +157,14 @@ class _ProfilePageState extends State<ProfilePage> {
                               width: 3,
                             ),
                           ),
-                          child: const Icon(
-                            Icons.camera_alt,
-                            size: 18,
-                            color: Colors.white,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(
+                              Icons.camera_alt,
+                              size: 18,
+                              color: Colors.white,
+                            ),
+                            onPressed: _pickProfileImage,
                           ),
                         ),
                       ),
@@ -157,7 +190,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  if (_kycStatus.isNotEmpty)
+                  if (_role == 'organizer' && _kycStatus.isNotEmpty)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
@@ -213,39 +246,45 @@ class _ProfilePageState extends State<ProfilePage> {
               child: Column(
                 children: [
                   // Personal Information Section
-                  _buildSectionTitle('Personal Information'),
+                  _buildSectionTitle(AppLocalizations.of(context).t('personal_info')),
                   const SizedBox(height: 12),
                   _buildInfoCard(
                     icon: Icons.person_outline,
                     title: 'Full Name',
                     value: userName,
-                    onTap: () => _showEditFieldDialog('Full Name', userName, (value) {
-                      setState(() {
-                        userName = value;
-                      });
-                    }),
+                    onTap: _role == 'organizer'
+                        ? () {}
+                        : () => _showEditFieldDialog('Full Name', userName, (value) {
+                              setState(() {
+                                userName = value;
+                              });
+                            }),
                   ),
                   const SizedBox(height: 12),
                   _buildInfoCard(
                     icon: Icons.email_outlined,
                     title: 'Email',
                     value: userEmail,
-                    onTap: () => _showEditFieldDialog('Email', userEmail, (value) {
-                      setState(() {
-                        userEmail = value;
-                      });
-                    }),
+                    onTap: _role == 'organizer'
+                        ? () {}
+                        : () => _showEditFieldDialog('Email', userEmail, (value) {
+                              setState(() {
+                                userEmail = value;
+                              });
+                            }),
                   ),
                   const SizedBox(height: 12),
                   _buildInfoCard(
                     icon: Icons.phone_outlined,
                     title: 'Phone Number',
                     value: userPhone,
-                    onTap: () => _showEditFieldDialog('Phone Number', userPhone, (value) {
-                      setState(() {
-                        userPhone = value;
-                      });
-                    }),
+                    onTap: _role == 'organizer'
+                        ? () {}
+                        : () => _showEditFieldDialog('Phone Number', userPhone, (value) {
+                              setState(() {
+                                userPhone = value;
+                              });
+                            }),
                   ),
                   const SizedBox(height: 12),
                   _buildInfoCard(
@@ -257,52 +296,105 @@ class _ProfilePageState extends State<ProfilePage> {
                         userLocation = value;
                       });
                     }),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: _locatingProfile
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(
+                                  Icons.my_location,
+                                  color: Colors.blue,
+                                  size: 20,
+                                ),
+                          onPressed: _locatingProfile ? null : _useCurrentLocationForProfile,
+                        ),
+                        Icon(Icons.chevron_right, color: Colors.grey[400]),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 30),
                   // Settings Section
-                  _buildSectionTitle('Settings'),
+                  _buildSectionTitle(AppLocalizations.of(context).t('settings')),
                   const SizedBox(height: 12),
+                  if (_role != 'organizer') ...[
+                    _buildMenuCard(
+                      icon: Icons.confirmation_number_outlined,
+                      title: AppLocalizations.of(context).t('your_tickets'),
+                      subtitle: AppLocalizations.of(context).t('your_tickets_subtitle'),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const YourTicketsPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   _buildMenuCard(
                     icon: Icons.notifications_outlined,
-                    title: 'Notifications',
-                    subtitle: 'Manage your notifications',
+                    title: AppLocalizations.of(context).t('notifications'),
+                    subtitle: AppLocalizations.of(context).t('notifications_subtitle'),
                     onTap: () {
-                      _showNotificationsSettings();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationSettingsPage(),
+                        ),
+                      );
                     },
                   ),
                   const SizedBox(height: 12),
                   // Removed Event Upload Dashboard from user profile
                   _buildMenuCard(
                     icon: Icons.lock_outline,
-                    title: 'Privacy & Security',
-                    subtitle: 'Manage your privacy settings',
+                    title: AppLocalizations.of(context).t('privacy_security'),
+                    subtitle: AppLocalizations.of(context).t('privacy_security_subtitle'),
                     onTap: () {
-                      _showPrivacySettings();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ChangePasswordPage(),
+                        ),
+                      );
                     },
                   ),
                   const SizedBox(height: 12),
                   _buildMenuCard(
                     icon: Icons.language_outlined,
-                    title: 'Language',
-                    subtitle: 'English',
+                    title: AppLocalizations.of(context).t('language'),
+                    subtitle: LocaleController.instance.locale.value.languageCode == 'ne'
+                        ? AppLocalizations.of(context).t('language_nepali')
+                        : AppLocalizations.of(context).t('language_english'),
                     onTap: () {
-                      _showLanguageSettings();
+                      _showLanguagePicker();
                     },
                   ),
                   const SizedBox(height: 12),
                   _buildMenuCard(
                     icon: Icons.help_outline,
-                    title: 'Help & Support',
-                    subtitle: 'Get help and contact support',
+                    title: AppLocalizations.of(context).t('help_support'),
+                    subtitle: AppLocalizations.of(context).t('help_support_subtitle'),
                     onTap: () {
-                      _showHelpSupport();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const HelpSupportPage(),
+                        ),
+                      );
                     },
                   ),
                   const SizedBox(height: 12),
                   _buildMenuCard(
                     icon: Icons.info_outline,
-                    title: 'About',
-                    subtitle: 'App version 1.0.0',
+                    title: AppLocalizations.of(context).t('about'),
+                    subtitle: AppLocalizations.of(context).t('about_subtitle'),
                     onTap: () {
                       _showAboutDialog();
                     },
@@ -323,14 +415,14 @@ class _ProfilePageState extends State<ProfilePage> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.logout),
-                          SizedBox(width: 8),
+                          const Icon(Icons.logout),
+                          const SizedBox(width: 8),
                           Text(
-                            'Logout',
-                            style: TextStyle(
+                            AppLocalizations.of(context).t('logout'),
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -368,6 +460,7 @@ class _ProfilePageState extends State<ProfilePage> {
     required String title,
     required String value,
     required VoidCallback onTap,
+    Widget? trailing,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -420,7 +513,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: Colors.grey[400]),
+            trailing ?? Icon(Icons.chevron_right, color: Colors.grey[400]),
           ],
         ),
       ),
@@ -596,19 +689,35 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  void _showLanguageSettings() {
-    showDialog(
+  void _showLanguagePicker() {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Language Settings'),
-        content: const Text('Language selection will be implemented here.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
+      builder: (context) {
+        final currentCode = LocaleController.instance.locale.value.languageCode;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.language),
+              title: Text(AppLocalizations.of(context).t('language_english')),
+              trailing: currentCode == 'en' ? const Icon(Icons.check) : null,
+              onTap: () {
+                LocaleController.instance.setLocale(const Locale('en'));
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.language),
+              title: Text(AppLocalizations.of(context).t('language_nepali')),
+              trailing: currentCode == 'ne' ? const Icon(Icons.check) : null,
+              onTap: () {
+                LocaleController.instance.setLocale(const Locale('ne'));
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -682,5 +791,128 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
   }
-}
 
+  Future<void> _useCurrentLocationForProfile() async {
+    if (_locatingProfile) return;
+    setState(() {
+      _locatingProfile = true;
+    });
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.deniedForever || permission == LocationPermission.denied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location permission denied. Enable it in settings.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+
+      String label = '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+      try {
+        final placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
+        if (placemarks.isNotEmpty) {
+          final p = placemarks.first;
+          final city = (p.locality ?? '').trim();
+          final area = (p.subLocality ?? '').trim();
+          final district = (p.administrativeArea ?? '').trim();
+          final parts = [
+            if (area.isNotEmpty) area,
+            if (city.isNotEmpty) city,
+            if (district.isNotEmpty) district,
+          ];
+          if (parts.isNotEmpty) {
+            label = parts.join(', ');
+          }
+        }
+      } catch (_) {
+        // ignore reverse-geocoding errors
+      }
+
+      if (mounted) {
+        setState(() {
+          userLocation = label;
+        });
+        await _saveField('Location', label);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to get location: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _locatingProfile = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickProfileImage() async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+      if (picked == null) return;
+      final file = File(picked.path);
+      setState(() {
+        _profileImageFile = file;
+      });
+
+      if (_userId.isEmpty) return;
+
+      final uploadRes = await UploadService.uploadImage(file);
+      if (uploadRes['success'] == true && uploadRes['url'] is String) {
+        final url = uploadRes['url'] as String;
+        final res = await UserApiService.updateUser(_userId, {'avatar': url});
+        if (!mounted) return;
+        if (res['success'] == true) {
+          setState(() {
+            _avatarUrl = url;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile photo updated'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(res['message'] ?? 'Failed to save profile photo'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(uploadRes['message'] ?? 'Failed to upload image'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to pick image: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+}

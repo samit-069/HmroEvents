@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import '../models/event.dart';
 import '../widgets/event_card.dart';
 import '../models/event_store.dart';
 import 'profile_page.dart';
 import 'event_details_page.dart';
+import '../localization/app_localizations.dart';
 
 class DiscoverPage extends StatefulWidget {
   const DiscoverPage({super.key});
@@ -20,14 +23,16 @@ class _DiscoverPageState extends State<DiscoverPage> {
   List<Event> _filteredEvents = [];
   late VoidCallback _eventListener;
 
+  bool _locating = false;
+
   final List<Map<String, dynamic>> _categories = [
-    {'name': 'All Events', 'icon': Icons.local_fire_department, 'emoji': '🔥'},
-    {'name': 'Music', 'icon': Icons.music_note},
-    {'name': 'Conference', 'icon': Icons.business},
-    {'name': 'Sports', 'icon': Icons.sports_basketball},
-    {'name': 'Food & Drink', 'icon': Icons.restaurant},
-    {'name': 'Art & Culture', 'icon': Icons.palette},
-    {'name': 'Workshop', 'icon': Icons.school},
+    {'name': 'All Events', 'icon': Icons.local_fire_department, 'emoji': '🔥', 'key': 'discover_category_all'},
+    {'name': 'Music', 'icon': Icons.music_note, 'key': 'discover_category_music'},
+    {'name': 'Conference', 'icon': Icons.business, 'key': 'discover_category_conference'},
+    {'name': 'Sports', 'icon': Icons.sports_basketball, 'key': 'discover_category_sports'},
+    {'name': 'Food & Drink', 'icon': Icons.restaurant, 'key': 'discover_category_food'},
+    {'name': 'Art & Culture', 'icon': Icons.palette, 'key': 'discover_category_art'},
+    {'name': 'Workshop', 'icon': Icons.school, 'key': 'discover_category_workshop'},
   ];
 
   @override
@@ -76,6 +81,84 @@ class _DiscoverPageState extends State<DiscoverPage> {
     await _eventStore.toggleBookmark(event.id);
   }
 
+  Future<void> _useCurrentLocation() async {
+    if (_locating) return;
+    setState(() {
+      _locating = true;
+    });
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.deniedForever ||
+          permission == LocationPermission.denied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(AppLocalizations.of(context).t('discover_location_permission_denied')),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      String label = '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+      try {
+        final placemarks = await placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+        if (placemarks.isNotEmpty) {
+          final p = placemarks.first;
+          final city = (p.locality ?? '').trim();
+          final area = (p.subLocality ?? '').trim();
+          final district = (p.administrativeArea ?? '').trim();
+          final parts = [
+            if (area.isNotEmpty) area,
+            if (city.isNotEmpty) city,
+            if (district.isNotEmpty) district,
+          ];
+          if (parts.isNotEmpty) {
+            label = parts.join(', ');
+          }
+        }
+      } catch (_) {
+        // ignore reverse-geocoding errors, keep lat/long label
+      }
+
+      if (mounted) {
+        setState(() {
+          currentLocation = label;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)
+                  .t('discover_location_failed')
+                  .replaceFirst('{error}', e.toString()),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _locating = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -98,9 +181,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Discover Events',
-                      style: TextStyle(
+                    Text(
+                      AppLocalizations.of(context).t('discover_title'),
+                      style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -161,10 +244,10 @@ class _DiscoverPageState extends State<DiscoverPage> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: TextField(
-                          decoration: const InputDecoration(
-                            hintText: 'Change your location...',
+                          decoration: InputDecoration(
+                            hintText: AppLocalizations.of(context).t('discover_location_hint'),
                             border: InputBorder.none,
-                            hintStyle: TextStyle(color: Colors.grey),
+                            hintStyle: const TextStyle(color: Colors.grey),
                           ),
                           onSubmitted: (value) {
                             if (value.isNotEmpty) {
@@ -185,13 +268,17 @@ class _DiscoverPageState extends State<DiscoverPage> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: IconButton(
-                        icon: const Icon(
-                          Icons.my_location,
-                          color: Colors.blue,
-                        ),
-                        onPressed: () {
-                          // Get current location
-                        },
+                        icon: _locating
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(
+                                Icons.my_location,
+                                color: Colors.blue,
+                              ),
+                        onPressed: _locating ? null : _useCurrentLocation,
                       ),
                     ),
                   ],
@@ -244,7 +331,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
                           ),
                         const SizedBox(width: 8),
                         Text(
-                          category['name'],
+                          AppLocalizations.of(context).t(category['key'] as String),
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -270,7 +357,11 @@ class _DiscoverPageState extends State<DiscoverPage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          selectedCategory,
+                          AppLocalizations.of(context).t(
+                            _categories
+                                .firstWhere((c) => c['name'] == selectedCategory)['key']
+                                as String,
+                          ),
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -278,7 +369,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
                           ),
                         ),
                         Text(
-                          '${_filteredEvents.length} events',
+                          '${_filteredEvents.length} ${AppLocalizations.of(context).t('discover_events_suffix')}',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey[600],

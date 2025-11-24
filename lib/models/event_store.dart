@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'event.dart';
 import '../services/event_api_service.dart';
+import '../services/auth_service.dart';
 
 class EventStore {
   EventStore._internal() {
@@ -50,7 +51,21 @@ class EventStore {
   }
 
   Future<void> refreshEvents() async {
-    final list = await EventApiService.getEvents();
+    String? userId;
+    try {
+      final me = await AuthService.getCurrentUser();
+      if (me['success'] == true && me['user'] != null) {
+        final user = me['user'] as Map<String, dynamic>;
+        final role = (user['role'] ?? '').toString();
+        if (role == 'organizer') {
+          userId = (user['_id'] ?? user['id'] ?? '').toString();
+        }
+      }
+    } catch (_) {
+      userId = null;
+    }
+
+    final list = await EventApiService.getEvents(userId: userId);
     _events = list;
     _notifyListeners();
   }

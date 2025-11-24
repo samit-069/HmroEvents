@@ -1,7 +1,7 @@
 class ApiConfig {
   // Update this to your PC's IP so the phone can reach the backend
   // Example: http://192.168.1.50:5000/api
-  static const String baseUrl = 'http://192.168.18.71:5000/api';
+  static const String baseUrl = 'http://10.10.9.38:5000/api';
 
   // Auth endpoints
   static const String register = '/auth/register';

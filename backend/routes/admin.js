@@ -87,7 +87,25 @@ router.post('/users/:id/block-toggle', async (req, res) => {
 // Edit user basic fields
 router.put('/users/:id', async (req, res) => {
   try {
-    const { firstName, lastName, name, email, phone, location, isBlocked, kycStatus } = req.body || {};
+    const {
+      firstName,
+      lastName,
+      name,
+      email,
+      phone,
+      location,
+      avatar,
+      isBlocked,
+      kycStatus,
+      // Organizer KYC detail fields
+      kycDob,
+      kycCitizenshipNumber,
+      kycProvince,
+      kycDistrict,
+      kycMunicipality,
+      kycWard,
+      kycStreet,
+    } = req.body || {};
     const update = {};
     if (firstName !== undefined) update.firstName = firstName;
     if (lastName !== undefined) update.lastName = lastName;
@@ -104,8 +122,17 @@ router.put('/users/:id', async (req, res) => {
     if (email !== undefined) update.email = email;
     if (phone !== undefined) update.phone = phone;
     if (location !== undefined) update.location = location;
+    if (avatar !== undefined) update.avatar = avatar;
     if (isBlocked !== undefined) update.isBlocked = !!isBlocked;
     if (kycStatus !== undefined) update.kycStatus = kycStatus;
+    // Organizer KYC detail fields
+    if (kycDob !== undefined) update.kycDob = kycDob;
+    if (kycCitizenshipNumber !== undefined) update.kycCitizenshipNumber = kycCitizenshipNumber;
+    if (kycProvince !== undefined) update.kycProvince = kycProvince;
+    if (kycDistrict !== undefined) update.kycDistrict = kycDistrict;
+    if (kycMunicipality !== undefined) update.kycMunicipality = kycMunicipality;
+    if (kycWard !== undefined) update.kycWard = kycWard;
+    if (kycStreet !== undefined) update.kycStreet = kycStreet;
 
     const user = await User.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });

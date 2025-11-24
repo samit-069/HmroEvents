@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 import 'profile_page.dart';
 import 'event_upload_dashboard.dart';
+import 'organizer_ticket_scanner_page.dart';
 
 class OrganizerMainNavigation extends StatefulWidget {
   const OrganizerMainNavigation({super.key});
@@ -14,6 +16,7 @@ class _OrganizerMainNavigationState extends State<OrganizerMainNavigation> {
 
   final List<Widget> _pages = const [
     EventUploadDashboard(),
+    OrganizerTicketScannerPage(),
     ProfilePage(),
   ];
 
@@ -31,6 +34,10 @@ class _OrganizerMainNavigationState extends State<OrganizerMainNavigation> {
           BottomNavigationBarItem(
             icon: Icon(Icons.cloud_upload_outlined),
             label: 'Create Event',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.qr_code_scanner),
+            label: 'Scan Ticket',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),

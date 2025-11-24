@@ -118,4 +118,37 @@ class AuthService {
       };
     }
   }
+
+  static Future<Map<String, dynamic>> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final uri = Uri.parse(ApiConfig.getUrl('/auth/change-password'));
+      final res = await http.post(
+        uri,
+        headers: await getHeaders(),
+        body: jsonEncode({
+          'oldPassword': oldPassword,
+          'newPassword': newPassword,
+        }),
+      );
+      final data = jsonDecode(res.body);
+      if (res.statusCode == 200 && data['success'] == true) {
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Password updated successfully',
+        };
+      }
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Failed to update password',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Network error: ${e.toString()}',
+      };
+    }
+  }
 }

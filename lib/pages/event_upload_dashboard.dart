@@ -7,6 +7,8 @@ import '../models/event_store.dart';
 import '../widgets/event_card.dart';
 import '../services/event_api_service.dart';
 import '../services/upload_service.dart';
+import '../services/notification_service.dart';
+import '../localization/app_localizations.dart';
 import 'event_details_page.dart';
 
 class EventUploadDashboard extends StatefulWidget {
@@ -106,7 +108,7 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Event Us'),
+        title: Text(AppLocalizations.of(context).t('eventus_title')),
         centerTitle: true,
       ),
       body: SafeArea(child: body),
@@ -120,22 +122,24 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
     return Row(
       children: [
         _StatCard(
-          title: 'Total Events',
+          title: AppLocalizations.of(context).t('event_upload_total_events'),
           value: '${allEvents.length}',
           icon: Icons.event_available,
           color: Colors.blue,
         ),
         const SizedBox(width: 12),
         _StatCard(
-          title: 'Your Uploads',
+          title: AppLocalizations.of(context).t('event_upload_your_uploads'),
           value: '${userEvents.length}',
           icon: Icons.upload_file,
           color: Colors.deepPurple,
         ),
         const SizedBox(width: 12),
         _StatCard(
-          title: 'Next Live',
-          value: nextEventDate != null ? _formatDate(nextEventDate) : 'N/A',
+          title: AppLocalizations.of(context).t('event_upload_next_live'),
+          value: nextEventDate != null
+              ? _formatDate(nextEventDate)
+              : AppLocalizations.of(context).t('event_upload_n_a'),
           icon: Icons.schedule,
           color: Colors.green,
         ),
@@ -180,9 +184,9 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Create an Event',
-              style: TextStyle(
+            Text(
+              AppLocalizations.of(context).t('event_upload_create_title'),
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
@@ -190,10 +194,12 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
             const SizedBox(height: 20),
             _buildTextField(
               controller: _titleController,
-              label: 'Event Title',
+              label: AppLocalizations.of(context).t('event_upload_event_title'),
               icon: Icons.title,
               validator: (value) =>
-                  value == null || value.trim().isEmpty ? 'Title is required' : null,
+                  value == null || value.trim().isEmpty
+                      ? AppLocalizations.of(context).t('event_upload_title_required')
+                      : null,
             ),
             const SizedBox(height: 16),
             _buildCategorySelector(),
@@ -208,10 +214,12 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
             const SizedBox(height: 16),
             _buildTextField(
               controller: _locationController,
-              label: 'Location',
+              label: AppLocalizations.of(context).t('event_upload_location'),
               icon: Icons.location_on_outlined,
               validator: (value) =>
-                  value == null || value.trim().isEmpty ? 'Location is required' : null,
+                  value == null || value.trim().isEmpty
+                      ? AppLocalizations.of(context).t('event_upload_location_required')
+                      : null,
             ),
             const SizedBox(height: 16),
             Row(
@@ -219,7 +227,7 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
                 Expanded(
                   child: _buildTextField(
                     controller: _priceController,
-                    label: 'Ticket Price',
+                    label: AppLocalizations.of(context).t('event_upload_ticket_price'),
                     icon: Icons.sell_outlined,
                   ),
                 ),
@@ -227,15 +235,15 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
                 Expanded(
                   child: _buildTextField(
                     controller: _attendeesController,
-                    label: 'Expected Attendees',
+                    label: AppLocalizations.of(context).t('event_upload_expected_attendees'),
                     icon: Icons.people_outline,
                     keyboardType: TextInputType.number,
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
-                        return 'Required';
+                        return AppLocalizations.of(context).t('event_upload_required');
                       }
                       if (int.tryParse(value) == null) {
-                        return 'Enter a number';
+                        return AppLocalizations.of(context).t('event_upload_enter_number');
                       }
                       return null;
                     },
@@ -254,9 +262,9 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Banner Image',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                  Text(
+                    AppLocalizations.of(context).t('event_upload_banner_image'),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -264,13 +272,13 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
                       ElevatedButton.icon(
                         onPressed: _pickBannerImage,
                         icon: const Icon(Icons.photo_library_outlined),
-                        label: const Text('Choose from Gallery'),
+                        label: Text(AppLocalizations.of(context).t('event_upload_choose_gallery')),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           _imageUrlController.text.isEmpty
-                              ? 'No file selected'
+                              ? AppLocalizations.of(context).t('event_upload_no_file')
                               : _imageUrlController.text,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -311,13 +319,13 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
             const SizedBox(height: 16),
             _buildTextField(
               controller: _organizerController,
-              label: 'Organizer Name',
+              label: AppLocalizations.of(context).t('event_upload_organizer_name'),
               icon: Icons.badge_outlined,
             ),
             const SizedBox(height: 16),
             _buildTextField(
               controller: _descriptionController,
-              label: 'Event Description',
+              label: AppLocalizations.of(context).t('event_upload_description'),
               icon: Icons.description_outlined,
               maxLines: 4,
             ),
@@ -328,9 +336,9 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
               child: ElevatedButton.icon(
                 onPressed: _onSubmit,
                 icon: const Icon(Icons.cloud_upload),
-                label: const Text(
-                  'Publish Event',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                label: Text(
+                  AppLocalizations.of(context).t('event_upload_publish'),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
@@ -389,7 +397,7 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
         }
       },
       decoration: InputDecoration(
-        labelText: 'Category',
+        labelText: AppLocalizations.of(context).t('event_upload_category'),
         prefixIcon: const Icon(Icons.category_outlined),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -405,14 +413,18 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
         child: TextFormField(
           decoration: InputDecoration(
             labelText: _selectedDate != null
-                ? 'Date: ${_formatDate(_selectedDate!)}'
-                : 'Select Date',
+                ? AppLocalizations.of(context)
+                    .t('event_upload_date_with_value')
+                    .replaceFirst('{value}', _formatDate(_selectedDate!))
+                : AppLocalizations.of(context).t('event_upload_date_label'),
             prefixIcon: const Icon(Icons.calendar_today_outlined),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          validator: (_) => _selectedDate == null ? 'Select a date' : null,
+          validator: (_) => _selectedDate == null
+              ? AppLocalizations.of(context).t('event_upload_date_required')
+              : null,
         ),
       ),
     );
@@ -425,14 +437,18 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
         child: TextFormField(
           decoration: InputDecoration(
             labelText: _selectedTime != null
-                ? 'Time: ${_selectedTime!.format(context)}'
-                : 'Select Time',
+                ? AppLocalizations.of(context)
+                    .t('event_upload_time_with_value')
+                    .replaceFirst('{value}', _selectedTime!.format(context))
+                : AppLocalizations.of(context).t('event_upload_time_label'),
             prefixIcon: const Icon(Icons.schedule_outlined),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          validator: (_) => _selectedTime == null ? 'Select a time' : null,
+          validator: (_) => _selectedTime == null
+              ? AppLocalizations.of(context).t('event_upload_time_required')
+              : null,
         ),
       ),
     );
@@ -483,7 +499,7 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
 
     final attendees = int.tryParse(_attendeesController.text.trim()) ?? 0;
     final organizerName = _organizerController.text.trim().isEmpty
-        ? 'Independent Organizer'
+        ? AppLocalizations.of(context).t('event_upload_independent_organizer')
         : _organizerController.text.trim();
 
     // Upload image if it's a local file path
@@ -494,7 +510,10 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
         imageUrl = up['url'];
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(up['message'] ?? 'Failed to upload image'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(up['message'] ?? AppLocalizations.of(context).t('event_upload_failed_upload_image')),
+            backgroundColor: Colors.red,
+          ),
         );
         return;
       }
@@ -511,18 +530,35 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
       iconEmoji: '',
       organizer: organizerName,
       description: _descriptionController.text.trim().isEmpty
-          ? 'Details coming soon. Stay tuned!'
+          ? AppLocalizations.of(context).t('event_upload_details_coming')
           : _descriptionController.text.trim(),
     );
 
     if (resp['success'] == true) {
       await _eventStore.refreshEvents();
+      // Show a local notification to confirm the event is live
+      NotificationService.instance.showSimpleNotification(
+        title: AppLocalizations.of(context).t('event_upload_published_notification_title'),
+        body: _titleController.text.trim().isEmpty
+            ? AppLocalizations.of(context).t('event_upload_published_notification_body')
+            : _titleController.text.trim(),
+      );
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(resp['message'] ?? 'Event published successfully'), backgroundColor: Colors.green),
+        SnackBar(
+          content: Text(
+            resp['message'] ?? AppLocalizations.of(context).t('event_upload_published_success'),
+          ),
+          backgroundColor: Colors.green,
+        ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(resp['message'] ?? 'Failed to publish event'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(
+            resp['message'] ?? AppLocalizations.of(context).t('event_upload_published_failed'),
+          ),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -555,13 +591,13 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
           children: [
             Icon(Icons.dashboard_customize, size: 48, color: Colors.grey[400]),
             const SizedBox(height: 12),
-            const Text(
-              'No uploads yet',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            Text(
+              AppLocalizations.of(context).t('event_upload_no_uploads_title'),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             Text(
-              'Publish your first event to see it appear here.',
+              AppLocalizations.of(context).t('event_upload_no_uploads_subtitle'),
               style: TextStyle(color: Colors.grey[600]),
               textAlign: TextAlign.center,
             ),
@@ -573,9 +609,9 @@ class _EventUploadDashboardState extends State<EventUploadDashboard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Recent Uploads',
-          style: TextStyle(
+        Text(
+          AppLocalizations.of(context).t('event_upload_recent_uploads'),
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),

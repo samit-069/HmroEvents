@@ -1,12 +1,26 @@
 const express = require('express');
-const { authorize, protect } = require('../middleware/auth');
 const User = require('../models/User');
+const { protect, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
 router.get('/', protect, authorize('admin'), async (req, res) => {
   const users = await User.find();
   res.json({ success: true, count: users.length, data: { users } });
+});
+
+router.post('/device-token', protect, async (req, res) => {
+  try {
+    const { deviceToken } = req.body;
+    if (!deviceToken) {
+      return res.status(400).json({ success: false, message: 'deviceToken is required' });
+    }
+
+    await User.findByIdAndUpdate(req.user._id, { deviceToken }, { new: true });
+    res.json({ success: true, message: 'Device token updated' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
 });
 
 router.get('/organizers', async (req, res) => {

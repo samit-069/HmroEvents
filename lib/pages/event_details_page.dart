@@ -5,6 +5,8 @@ import '../services/event_api_service.dart';
 import '../models/event_store.dart';
 import '../widgets/event_edit_dialog.dart';
 import '../services/auth_service.dart';
+import '../services/esewa_service.dart';
+import '../services/ticket_api_service.dart';
 
 class EventDetailsPage extends StatefulWidget {
   final Event event;
@@ -436,8 +438,26 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: () {
-                            _showGetTicketsDialog();
+                          onPressed: () async {
+                            // Check if user already has a ticket for this event
+                            final hasTicket = await TicketApiService.hasTicket(event.id);
+                            if (hasTicket) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('You have already booked a ticket for this event.'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
+
+                            EsewaService.payForEvent(
+                              context: context,
+                              eventId: event.id,
+                              title: event.title,
+                              priceText: event.price,
+                            );
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue,
@@ -562,21 +582,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
     );
   }
 
-  void _showGetTicketsDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Get Tickets'),
-        content: Text('Ticket purchasing for "${widget.event.title}" will be implemented here.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
+  void _showGetTicketsDialog() {}
 
   void _shareEvent() {
     ScaffoldMessenger.of(context).showSnackBar(
